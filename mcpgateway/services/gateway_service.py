@@ -399,11 +399,11 @@ class GatewayService:
         gateway = db.get(DbGateway, gateway_id)
         if not gateway:
             raise GatewayNotFoundError(f"Gateway not found: {gateway_id}")
-
+            
         if gateway.enabled or include_inactive:
             return GatewayRead.model_validate(gateway)
-        else:
-            raise GatewayNotFoundError(f"Gateway not found: {gateway_id}")
+            
+        raise GatewayNotFoundError(f"Gateway not found: {gateway_id}")
 
     async def toggle_gateway_status(self, db: Session, gateway_id: str, activate: bool, reachable: bool = True, only_update_reachable: bool = False) -> GatewayRead:
         """Toggle gateway active status.
