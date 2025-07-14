@@ -178,18 +178,32 @@ function fetchWithTimeout(url, options = {}, timeout = 10000) {
     })
         .then((response) => {
             clearTimeout(timeoutId);
-
-            // Handle empty responses explicitly
             if (
                 response.status === 0 ||
-                (response.ok &&
-                    response.status === 200 &&
-                    !response.headers.get("content-length"))
+                (response.ok && response.status === 200)
             ) {
-                console.warn(`Empty response received from ${url}`);
-                throw new Error("Server returned an empty response");
-            }
+                const contentLength = response.headers.get("content-length");
 
+                // Check Content-Length if present
+                if (contentLength !== null) {
+                    if (parseInt(contentLength, 10) === 0) {
+                        throw new Error(
+                            "Server returned an empty response (via header)",
+                        );
+                    }
+                } else {
+                    // Fallback: check actual body
+                    const cloned = response.clone();
+                    return cloned.text().then((text) => {
+                        if (!text.trim()) {
+                            throw new Error(
+                                "Server returned an empty response (via body)",
+                            );
+                        }
+                        return response;
+                    });
+                }
+            }
             return response;
         })
         .catch((error) => {
@@ -3342,6 +3356,7 @@ async function handleGatewayTestSubmit(e) {
     const loading = safeGetElement("gateway-test-loading");
     const responseDiv = safeGetElement("gateway-test-response-json");
     const resultDiv = safeGetElement("gateway-test-result");
+    const testButton = safeGetElement("gateway-test-submit");
 
     try {
         // Show loading
@@ -3350,6 +3365,10 @@ async function handleGatewayTestSubmit(e) {
         }
         if (resultDiv) {
             resultDiv.classList.add("hidden");
+        }
+        if (testButton) {
+            testButton.disabled = true;
+            testButton.textContent = "Testing...";
         }
 
         const form = e.target;
@@ -3416,31 +3435,32 @@ async function handleGatewayTestSubmit(e) {
 
         const result = await response.json();
 
-        if (responseDiv) {
-            // Display result safely
-            responseDiv.innerHTML = `
-                <div class="alert alert-success">
-                    <h4>✅ Connection Successful</h4>
-                    <p><strong>Status Code:</strong> ${result.statusCode}</p>
-                    <p><strong>Response Time:</strong> ${result.latencyMs}ms</p>
-                    ${
-                        result.body
-                            ? `<details>
-                        <summary class='cursor-pointer'>Response Body</summary>
-                        <pre class="text-sm px-4 max-h-96 dark:bg-gray-800 dark:text-gray-100 overflow-auto">${JSON.stringify(result.body, null, 2)}</pre>
-                    </details>`
-                            : ""
-                    }
-                </div>
-            `;
-        } else {
-            responseDiv.innerHTML = `
-            <div class="alert alert-error">
-                <h4>❌ Connection Failed</h4>
-                <p>${result.error || "Unable to connect to the server"}</p>
-            </div>
+        const isSuccess =
+            result.statusCode &&
+            result.statusCode >= 200 &&
+            result.statusCode < 300;
+
+        const alertType = isSuccess ? "success" : "error";
+        const icon = isSuccess ? "✅" : "❌";
+        const title = isSuccess ? "Connection Successful" : "Connection Failed";
+        const statusCode = result.statusCode || "Unknown";
+        const latency =
+            result.latencyMs != null ? `${result.latencyMs}ms` : "NA";
+        const body = result.body
+            ? `<details open>
+                <summary class='cursor-pointer'><strong>Response Body</strong></summary>
+                <pre class="text-sm px-4 max-h-96 dark:bg-gray-800 dark:text-gray-100 overflow-auto">${JSON.stringify(result.body, null, 2)}</pre>
+            </details>`
+            : "";
+
+        responseDiv.innerHTML = `
+        <div class="alert alert-${alertType}">
+            <h4><strong>${icon} ${title}</strong></h4>
+            <p><strong>Status Code:</strong> ${statusCode}</p>
+            <p><strong>Response Time:</strong> ${latency}</p>
+            ${body}
+        </div>
         `;
-        }
     } catch (error) {
         console.error("Gateway test error:", error);
         if (responseDiv) {
@@ -3457,6 +3477,9 @@ async function handleGatewayTestSubmit(e) {
         if (resultDiv) {
             resultDiv.classList.remove("hidden");
         }
+
+        testButton.disabled = false;
+        testButton.textContent = "Test";
     }
 }
 
@@ -4110,6 +4133,104 @@ if (window.performance && window.performance.mark) {
 }
 
 // ===================================================================
+// Tool Tips for components with Alpine.js
+// ===================================================================
+
+/* global Alpine */
+function setupTooltipsWithAlpine() {
+    document.addEventListener("alpine:init", () => {
+        console.log("Initializing Alpine tooltip directive...");
+
+        Alpine.directive("tooltip", (el, { expression }, { evaluate }) => {
+            let tooltipEl = null;
+
+            const moveTooltip = (e) => {
+                if (!tooltipEl) {
+                    return;
+                }
+
+                const paddingX = 12;
+                const paddingY = 20;
+                const tipRect = tooltipEl.getBoundingClientRect();
+
+                let left = e.clientX + paddingX;
+                let top = e.clientY + paddingY;
+
+                if (left + tipRect.width > window.innerWidth - 8) {
+                    left = e.clientX - tipRect.width - paddingX;
+                }
+                if (top + tipRect.height > window.innerHeight - 8) {
+                    top = e.clientY - tipRect.height - paddingY;
+                }
+
+                tooltipEl.style.left = `${left}px`;
+                tooltipEl.style.top = `${top}px`;
+            };
+
+            const showTooltip = (event) => {
+                const text = evaluate(expression);
+                if (!text) {
+                    return;
+                }
+
+                hideTooltip(); // Clean up any existing tooltip
+
+                tooltipEl = document.createElement("div");
+                tooltipEl.textContent = text;
+                tooltipEl.setAttribute("role", "tooltip");
+                tooltipEl.className =
+                    "fixed z-50 max-w-xs px-3 py-2 text-sm text-white bg-black/80 rounded-lg shadow-lg pointer-events-none opacity-0 transition-opacity duration-200";
+
+                document.body.appendChild(tooltipEl);
+
+                if (event?.clientX && event?.clientY) {
+                    moveTooltip(event);
+                    el.addEventListener("mousemove", moveTooltip);
+                } else {
+                    const rect = el.getBoundingClientRect();
+                    const scrollY = window.scrollY || window.pageYOffset;
+                    const scrollX = window.scrollX || window.pageXOffset;
+                    tooltipEl.style.left = `${rect.left + scrollX}px`;
+                    tooltipEl.style.top = `${rect.bottom + scrollY + 10}px`;
+                }
+
+                requestAnimationFrame(() => {
+                    tooltipEl.style.opacity = "1";
+                });
+                window.addEventListener("scroll", hideTooltip, {
+                    passive: true,
+                });
+                window.addEventListener("resize", hideTooltip, {
+                    passive: true,
+                });
+            };
+
+            const hideTooltip = () => {
+                if (!tooltipEl) {
+                    return;
+                }
+
+                tooltipEl.style.opacity = "0";
+                el.removeEventListener("mousemove", moveTooltip);
+                window.removeEventListener("scroll", hideTooltip);
+                window.removeEventListener("resize", hideTooltip);
+                el.addEventListener("click", hideTooltip);
+                const toRemove = tooltipEl;
+                tooltipEl = null;
+                setTimeout(() => toRemove.remove(), 200);
+            };
+            el.addEventListener("mouseenter", showTooltip);
+            el.addEventListener("mouseleave", hideTooltip);
+            el.addEventListener("focus", showTooltip);
+            el.addEventListener("blur", hideTooltip);
+            el.addEventListener("click", hideTooltip);
+        });
+    });
+}
+
+setupTooltipsWithAlpine();
+
+// ===================================================================
 // SINGLE CONSOLIDATED INITIALIZATION SYSTEM
 // ===================================================================
 
@@ -4117,6 +4238,8 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("🔐 DOM loaded - initializing secure admin interface...");
 
     try {
+        // initializeTooltips();
+
         // 1. Initialize CodeMirror editors first
         initializeCodeMirrorEditors();
 
