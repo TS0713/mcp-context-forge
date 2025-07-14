@@ -378,9 +378,6 @@ class GatewayService:
                 logger.info(f"Updated gateway: {gateway.name}")
                 return GatewayRead.model_validate(gateway)
 
-            if not (gateway.enabled and gateway.reachable):
-                raise GatewayNotFoundError(f"Gateway not found: {gateway_id}")
-
         except Exception as e:
             db.rollback()
             raise GatewayError(f"Failed to update gateway: {str(e)}")
