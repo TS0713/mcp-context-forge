@@ -22,6 +22,7 @@ gateway-specific extensions for federation support.
 # Standard
 import base64
 from datetime import datetime, timezone
+from enum import Enum
 import json
 import logging
 import re
@@ -1541,6 +1542,14 @@ class PromptInvocation(BaseModelWithConfigDict):
 # --- Gateway Schemas ---
 
 
+# --- Transport Type ---
+class TransportType(str, Enum):
+    SSE = "SSE"
+    HTTP = "HTTP"
+    STDIO = "STDIO"
+    STREAMABLEHTTP = "STREAMABLEHTTP"
+
+
 class GatewayCreate(BaseModel):
     """
     Schema for creating a new gateway.
@@ -1649,6 +1658,13 @@ class GatewayCreate(BaseModel):
         auth_value = cls._process_auth_fields(info)
 
         return auth_value
+
+    @field_validator("transport")
+    @classmethod
+    def validate_transport(cls, v: str) -> str:
+        if v not in [t.value for t in TransportType]:
+            raise ValueError(f"Invalid transport type: {v}. Must be one of: {', '.join([t.value for t in TransportType])}")
+        return v
 
     @staticmethod
     def _process_auth_fields(info: ValidationInfo) -> Optional[Dict[str, Any]]:

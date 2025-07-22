@@ -470,7 +470,8 @@ class Settings(BaseSettings):
             ...     print('error')
             error
         """
-        valid_types = {"http", "ws", "sse", "all"}
+        # valid_types = {"http", "ws", "sse", "all"}
+        valid_types = {"sse", "streamablehttp", "all","http"}
         if self.transport_type not in valid_types:
             raise ValueError(f"Invalid transport type. Must be one of: {valid_types}")
 
