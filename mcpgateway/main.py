@@ -3042,7 +3042,7 @@ async def handle_rpc(request: Request, db: Session = Depends(get_db), user=Depen
     try:
         # Extract user identifier from either RBAC user object or JWT payload
         if hasattr(user, "email"):
-            user_id = user.email  # RBAC user object
+            user_id = getattr(user, "email", None)  # RBAC user object
         elif isinstance(user, dict):
             user_id = user.get("sub") or user.get("email") or user.get("username", "unknown")  # JWT payload
         else:
@@ -3631,10 +3631,12 @@ async def export_configuration(
             tags_list = [t.strip() for t in tags.split(",") if t.strip()]
 
         # Extract username from user (which is now an EmailUser object)
-        if hasattr(user,"email"):
-            username = user.email
-        elif isinstance(user,dict):
+        if hasattr(user, "email"):
+            username = getattr(user, "email", None)
+        elif isinstance(user, dict):
             username = user.get("email")
+        else:
+            username = None
 
         # Get root path for URL construction
         root_path = request.scope.get("root_path", "") if request else ""
@@ -3692,9 +3694,9 @@ async def export_selective_configuration(
         logger.info(f"User {user} requested selective configuration export")
 
         # Extract username from user (which is now an EmailUser object)
-        if hasattr(user,"email"):
-            username = user.email
-        elif isinstance(user,dict):
+        if hasattr(user, "email"):
+            username = getattr(user, "email", None)
+        elif isinstance(user, dict):
             username = user.get("email")
 
         export_data = await export_service.export_selective(db=db, entity_selections=entity_selections, include_dependencies=include_dependencies, exported_by=username)
@@ -3748,9 +3750,9 @@ async def import_configuration(
             raise HTTPException(status_code=400, detail=f"Invalid conflict strategy. Must be one of: {[s.value for s in ConflictStrategy]}")
 
         # Extract username from user (which is now an EmailUser object)
-        if hasattr(user,"email"):
-            username = user.email
-        elif isinstance(user,dict):
+        if hasattr(user, "email"):
+            username = getattr(user, "email", None)
+        elif isinstance(user, dict):
             username = user.get("email")
 
         # Perform import
