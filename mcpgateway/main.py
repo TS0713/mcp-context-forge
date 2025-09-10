@@ -3631,7 +3631,10 @@ async def export_configuration(
             tags_list = [t.strip() for t in tags.split(",") if t.strip()]
 
         # Extract username from user (which is now an EmailUser object)
-        username = user.email
+        if hasattr(user,"email"):
+            username = user.email
+        elif isinstance(user,dict):
+            username = user.get("email")
 
         # Get root path for URL construction
         root_path = request.scope.get("root_path", "") if request else ""
@@ -3689,7 +3692,10 @@ async def export_selective_configuration(
         logger.info(f"User {user} requested selective configuration export")
 
         # Extract username from user (which is now an EmailUser object)
-        username = user.email
+        if hasattr(user,"email"):
+            username = user.email
+        elif isinstance(user,dict):
+            username = user.get("email")
 
         export_data = await export_service.export_selective(db=db, entity_selections=entity_selections, include_dependencies=include_dependencies, exported_by=username)
 
@@ -3742,7 +3748,10 @@ async def import_configuration(
             raise HTTPException(status_code=400, detail=f"Invalid conflict strategy. Must be one of: {[s.value for s in ConflictStrategy]}")
 
         # Extract username from user (which is now an EmailUser object)
-        username = user.email
+        if hasattr(user,"email"):
+            username = user.email
+        elif isinstance(user,dict):
+            username = user.get("email")
 
         # Perform import
         import_status = await import_service.import_configuration(
