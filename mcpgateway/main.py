@@ -3616,7 +3616,7 @@ async def export_configuration(
     """
     try:
         logger.info(f"User {user} requested configuration export")
-
+        username: Optional[str] = None
         # Parse parameters
         include_types = None
         if types:
@@ -3634,7 +3634,7 @@ async def export_configuration(
         if hasattr(user, "email"):
             username = getattr(user, "email", None)
         elif isinstance(user, dict):
-            username = user.get("email")
+            username = user.get("email", None)
         else:
             username = None
 
@@ -3693,6 +3693,7 @@ async def export_selective_configuration(
     try:
         logger.info(f"User {user} requested selective configuration export")
 
+        username: Optional[str] = None
         # Extract username from user (which is now an EmailUser object)
         if hasattr(user, "email"):
             username = getattr(user, "email", None)
@@ -3753,7 +3754,9 @@ async def import_configuration(
         if hasattr(user, "email"):
             username = getattr(user, "email", None)
         elif isinstance(user, dict):
-            username = user.get("email")
+            username = user.get("email", None)
+        else:
+            username = None
 
         # Perform import
         import_status = await import_service.import_configuration(
