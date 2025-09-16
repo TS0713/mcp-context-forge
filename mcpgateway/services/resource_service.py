@@ -935,6 +935,8 @@ class ResourceService:
                 resource.mime_type = resource_update.mime_type
             if resource_update.template is not None:
                 resource.template = resource_update.template
+            if resource_update.visibility is not None:
+                resource.visibility = resource_update.visibility
 
             # Update content if provided
             if resource_update.content is not None:

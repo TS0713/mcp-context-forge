@@ -1487,8 +1487,17 @@ async def list_a2a_agents(
 
     logger.debug(f"User {user} requested A2A agent list with team_id={team_id}, visibility={visibility}, tags={tags_list}")
 
+    user_email: Optional[str] = "Unknown"
+    
+    if hasattr(user,"email"):
+        user_email = getattr(user,"email","Unknown")
+    elif isinstance(user,dict):
+        user_email = str(user.get("email","Unknown"))
+    else:
+        user_email = "Uknown"
+
     # Use team-aware filtering
-    return await a2a_service.list_agents_for_user(db, user_email=user, team_id=team_id, visibility=visibility, include_inactive=include_inactive, skip=skip, limit=limit)
+    return await a2a_service.list_agents_for_user(db, user_email=user_email, team_id=team_id, visibility=visibility, include_inactive=include_inactive, skip=skip, limit=limit)
 
 
 @a2a_router.get("/{agent_id}", response_model=A2AAgentRead)

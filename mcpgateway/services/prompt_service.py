@@ -248,6 +248,7 @@ class PromptService:
                 "lastExecutionTime": last_time,
             },
             "tags": db_prompt.tags or [],
+            "visibility": db_prompt.visibility,
         }
 
     async def register_prompt(
@@ -341,7 +342,7 @@ class PromptService:
                 # Team scoping fields - use schema values if provided, otherwise fallback to parameters
                 team_id=getattr(prompt, "team_id", None) or team_id,
                 owner_email=getattr(prompt, "owner_email", None) or owner_email or created_by,
-                visibility=getattr(prompt, "visibility", None) or visibility,
+                visibility=prompt.visibility,
             )
 
             # Add to DB
@@ -739,7 +740,8 @@ class PromptService:
                         schema["description"] = arg.description
                     argument_schema["properties"][arg.name] = schema
                 prompt.argument_schema = argument_schema
-
+            if prompt_update.visibility is not None:
+                prompt.visibility = prompt_update.visibility
             # Update tags if provided
             if prompt_update.tags is not None:
                 prompt.tags = prompt_update.tags
