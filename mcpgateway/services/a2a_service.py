@@ -685,4 +685,6 @@ class A2AAgentService:
             import_batch_id=db_agent.import_batch_id,
             federation_source=db_agent.federation_source,
             version=db_agent.version,
+            visibility=db_agent.visibility,
+            team_id = db_agent.team_id
         )

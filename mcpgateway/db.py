@@ -1999,6 +1999,11 @@ class Prompt(Base):
     # Many-to-many relationship with Servers
     servers: Mapped[List["Server"]] = relationship("Server", secondary=server_prompt_association, back_populates="prompts")
 
+    # Team scoping fields for resource organization
+    team_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("email_teams.id", ondelete="SET NULL"), nullable=True)
+    owner_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="private")
+    
     def validate_arguments(self, args: Dict[str, str]) -> None:
         """
         Validate prompt arguments against the argument schema.
@@ -2130,10 +2135,7 @@ class Prompt(Base):
             return None
         return max(m.timestamp for m in self.metrics)
 
-    # Team scoping fields for resource organization
-    team_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("email_teams.id", ondelete="SET NULL"), nullable=True)
-    owner_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="private")
+    
 
 
 class Server(Base):

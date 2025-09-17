@@ -248,6 +248,7 @@ class PromptService:
                 "lastExecutionTime": last_time,
             },
             "tags": db_prompt.tags or [],
+             "visibility": db_prompt.visibility,
             # Include metadata fields for proper API response
             "created_by": getattr(db_prompt, "created_by", None),
             "modified_by": getattr(db_prompt, "modified_by", None),
@@ -258,6 +259,7 @@ class PromptService:
             "modified_via": getattr(db_prompt, "modified_via", None),
             "modified_user_agent": getattr(db_prompt, "modified_user_agent", None),
             "version": getattr(db_prompt, "version", None),
+            "team_id": getattr(db_prompt, "team_id", None),
         }
 
     async def register_prompt(
@@ -733,6 +735,9 @@ class PromptService:
                     argument_schema["properties"][arg.name] = schema
                 prompt.argument_schema = argument_schema
 
+            if prompt_update.visibility is not None:
+                prompt.visibility = prompt_update.visibility
+                
             # Update tags if provided
             if prompt_update.tags is not None:
                 prompt.tags = prompt_update.tags
