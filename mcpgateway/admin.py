@@ -6137,7 +6137,7 @@ async def admin_add_resource(request: Request, db: Session = Depends(get_db), us
     # Parse tags from comma-separated string
     tags_str = str(form.get("tags", ""))
     tags: List[str] = [tag.strip() for tag in tags_str.split(",") if tag.strip()] if tags_str else []
-    visibility = str(form.get("visibility", "private"))
+    visibility = str(form.get("visibility", "public"))
     user_email = get_user_email(user)
     # Determine personal team for default assignment
     team_id = form.get("team_id", None)

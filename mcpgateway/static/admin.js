@@ -2392,7 +2392,8 @@ async function viewAgent(agentId) {
 
             // Capabilities + Config (JSON formatted)
             const capConfigDiv = document.createElement("div");
-            capConfigDiv.className = "mt-4 p-2 bg-gray-50 dark:bg-gray-800 rounded";
+            capConfigDiv.className =
+                "mt-4 p-2 bg-gray-50 dark:bg-gray-800 rounded";
             const capTitle = document.createElement("strong");
             capTitle.textContent = "Capabilities & Config:";
             capConfigDiv.appendChild(capTitle);
@@ -2402,7 +2403,7 @@ async function viewAgent(agentId) {
             pre.textContent = JSON.stringify(
                 { capabilities: agent.capabilities, config: agent.config },
                 null,
-                2
+                2,
             );
             capConfigDiv.appendChild(pre);
             container.appendChild(capConfigDiv);
@@ -2419,21 +2420,44 @@ async function viewAgent(agentId) {
             metadataGrid.className = "grid grid-cols-2 gap-4 mt-2 text-sm";
 
             const metadataFields = [
-                { label: "Created By", value: agent.created_by || "Legacy Entity" },
-                { label: "Created At", value: agent.created_at ? new Date(agent.created_at).toLocaleString() : "Pre-metadata" },
-                { label: "Created From", value: agent.created_from_ip || "Unknown" },
+                {
+                    label: "Created By",
+                    value: agent.created_by || "Legacy Entity",
+                },
+                {
+                    label: "Created At",
+                    value: agent.created_at
+                        ? new Date(agent.created_at).toLocaleString()
+                        : "Pre-metadata",
+                },
+                {
+                    label: "Created From",
+                    value: agent.created_from_ip || "Unknown",
+                },
                 { label: "Created Via", value: agent.created_via || "Unknown" },
-                { label: "Last Modified By", value: agent.modified_by || "N/A" },
-                { label: "Last Modified At", value: agent.updated_at ? new Date(agent.updated_at).toLocaleString() : "N/A" },
+                {
+                    label: "Last Modified By",
+                    value: agent.modified_by || "N/A",
+                },
+                {
+                    label: "Last Modified At",
+                    value: agent.updated_at
+                        ? new Date(agent.updated_at).toLocaleString()
+                        : "N/A",
+                },
                 { label: "Version", value: agent.version || "1" },
-                { label: "Import Batch", value: agent.import_batch_id || "N/A" },
+                {
+                    label: "Import Batch",
+                    value: agent.import_batch_id || "N/A",
+                },
             ];
 
             metadataFields.forEach((field) => {
                 const fieldDiv = document.createElement("div");
 
                 const labelSpan = document.createElement("span");
-                labelSpan.className = "font-medium text-gray-600 dark:text-gray-400";
+                labelSpan.className =
+                    "font-medium text-gray-600 dark:text-gray-400";
                 labelSpan.textContent = field.label + ":";
 
                 const valueSpan = document.createElement("span");
@@ -2460,7 +2484,6 @@ async function viewAgent(agentId) {
         showErrorMessage(errorMessage);
     }
 }
-
 
 /**
  * SECURE: View Resource function with safe display
@@ -2494,7 +2517,10 @@ async function viewResource(resourceUri) {
                 { label: "Name", value: resource.name },
                 { label: "Type", value: resource.mimeType || "N/A" },
                 { label: "Description", value: resource.description || "N/A" },
-                {label: "Visibility", value: resource.visibility || "private"}
+                {
+                    label: "Visibility",
+                    value: resource.visibility || "private",
+                },
             ];
 
             fields.forEach((field) => {
@@ -2734,7 +2760,6 @@ async function viewResource(resourceUri) {
     }
 }
 
-
 /**
  * SECURE: Edit Resource function with validation
  */
@@ -2753,7 +2778,7 @@ async function editResource(resourceUri) {
         const data = await response.json();
         const resource = data.resource;
         const content = data.content;
-          // Ensure hidden inactive flag is preserved
+        // Ensure hidden inactive flag is preserved
         const isInactiveCheckedBool = isInactiveChecked("resources");
         let hiddenField = safeGetElement("edit-resource-show-inactive");
         const editForm = safeGetElement("edit-resource-form");
@@ -2769,16 +2794,24 @@ async function editResource(resourceUri) {
         hiddenField.value = isInactiveCheckedBool;
 
         // ✅ Prefill visibility radios (consistent with server)
-        const visibility = resource.visibility ? resource.visibility.toLowerCase() : null;
+        const visibility = resource.visibility
+            ? resource.visibility.toLowerCase()
+            : null;
 
         const publicRadio = safeGetElement("edit-resource-visibility-public");
         const teamRadio = safeGetElement("edit-resource-visibility-team");
         const privateRadio = safeGetElement("edit-resource-visibility-private");
 
         // Clear all first
-        if (publicRadio) publicRadio.checked = false;
-        if (teamRadio) teamRadio.checked = false;
-        if (privateRadio) privateRadio.checked = false;
+        if (publicRadio) {
+            publicRadio.checked = false;
+        }
+        if (teamRadio) {
+            teamRadio.checked = false;
+        }
+        if (privateRadio) {
+            privateRadio.checked = false;
+        }
 
         if (visibility) {
             if (visibility === "public" && publicRadio) {
@@ -2900,7 +2933,7 @@ async function viewPrompt(promptName) {
             const fields = [
                 { label: "Name", value: prompt.name },
                 { label: "Description", value: prompt.description || "N/A" },
-                {label: "Visibility", value: prompt.visibility || "private"}
+                { label: "Visibility", value: prompt.visibility || "private" },
             ];
 
             fields.forEach((field) => {
@@ -3165,16 +3198,24 @@ async function editPrompt(promptName) {
         hiddenField.value = isInactiveCheckedBool;
 
         // ✅ Prefill visibility radios (consistent with server)
-        const visibility = prompt.visibility ? prompt.visibility.toLowerCase() : null;
+        const visibility = prompt.visibility
+            ? prompt.visibility.toLowerCase()
+            : null;
 
         const publicRadio = safeGetElement("edit-prompt-visibility-public");
         const teamRadio = safeGetElement("edit-prompt-visibility-team");
         const privateRadio = safeGetElement("edit-prompt-visibility-private");
 
         // Clear all first
-        if (publicRadio) publicRadio.checked = false;
-        if (teamRadio) teamRadio.checked = false;
-        if (privateRadio) privateRadio.checked = false;
+        if (publicRadio) {
+            publicRadio.checked = false;
+        }
+        if (teamRadio) {
+            teamRadio.checked = false;
+        }
+        if (privateRadio) {
+            privateRadio.checked = false;
+        }
 
         if (visibility) {
             if (visibility === "public" && publicRadio) {
@@ -3285,7 +3326,7 @@ async function viewGateway(gatewayId) {
                 { label: "Name", value: gateway.name },
                 { label: "URL", value: gateway.url },
                 { label: "Description", value: gateway.description || "N/A" },
-                {label: "Visibility", value: gateway.visibility || "private"}
+                { label: "Visibility", value: gateway.visibility || "private" },
             ];
 
             // Add tags field with special handling
@@ -3794,7 +3835,7 @@ async function viewServer(serverId) {
                 { label: "Server ID", value: server.id },
                 { label: "URL", value: getCatalogUrl(server) || "N/A" },
                 { label: "Type", value: "Virtual Server" },
-                {label: "Visibility", value: server.visibility || "private"}
+                { label: "Visibility", value: server.visibility || "private" },
             ];
 
             fields.forEach((field) => {
@@ -7046,7 +7087,7 @@ async function viewTool(toolId) {
             setTextSafely(".tool-url", tool.url);
             setTextSafely(".tool-type", tool.integrationType);
             setTextSafely(".tool-description", tool.description);
-            setTextSafely(".tool-visibility",tool.visibility)
+            setTextSafely(".tool-visibility", tool.visibility);
 
             // Set tags as HTML with badges
             const tagsElement = toolDetailsDiv.querySelector(".tool-tags");
@@ -7496,9 +7537,6 @@ async function handlePromptFormSubmit(e) {
             "team_id",
         );
         teamId && formData.append("team_id", teamId);
-
-        const visibility = form.querySelector("input[name='visibility']:checked")?.value || "private";
-
         const response = await fetch(`${window.ROOT_PATH}/admin/prompts`, {
             method: "POST",
             body: formData,
@@ -7689,16 +7727,16 @@ async function handleA2AFormSubmit(e) {
         }
 
         // Append visibility (radio buttons)
+
         // ✅ Ensure visibility is captured from checked radio button
-        const visibility = form.querySelector("input[name='visibility']:checked")?.value || "private";
-        //formData.set("visibility", visibility);
+
+        // formData.set("visibility", visibility);
         formData.append("visibility", formData.get("visibility"));
 
         const teamId = new URL(window.location.href).searchParams.get(
             "team_id",
         );
         teamId && formData.append("team_id", teamId);
-
 
         // Submit to backend
         const response = await fetch(`${window.ROOT_PATH}/admin/a2a`, {
