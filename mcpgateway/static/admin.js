@@ -2767,7 +2767,7 @@ async function editResource(resourceUri) {
             editForm.appendChild(hiddenField);
         }
         hiddenField.value = isInactiveCheckedBool;
-        
+
         // ✅ Prefill visibility radios (consistent with server)
         const visibility = resource.visibility ? resource.visibility.toLowerCase() : null;
 
@@ -3163,7 +3163,7 @@ async function editPrompt(promptName) {
             }
         }
         hiddenField.value = isInactiveCheckedBool;
-        
+
         // ✅ Prefill visibility radios (consistent with server)
         const visibility = prompt.visibility ? prompt.visibility.toLowerCase() : null;
 
@@ -7498,7 +7498,7 @@ async function handlePromptFormSubmit(e) {
         teamId && formData.append("team_id", teamId);
 
         const visibility = form.querySelector("input[name='visibility']:checked")?.value || "private";
-        
+
         const response = await fetch(`${window.ROOT_PATH}/admin/prompts`, {
             method: "POST",
             body: formData,

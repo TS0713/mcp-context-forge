@@ -147,7 +147,7 @@ class A2AAgentService:
         federation_source: Optional[str] = None,
         team_id: Optional[str] = None,
         owner_email: Optional[str] = None,
-        visibility: str = "private",
+        visibility: Optional[str] = "public",
     ) -> A2AAgentRead:
         """Register a new A2A agent.
 
@@ -686,5 +686,5 @@ class A2AAgentService:
             federation_source=db_agent.federation_source,
             version=db_agent.version,
             visibility=db_agent.visibility,
-            team_id = db_agent.team_id
+            team_id=db_agent.team_id,
         )

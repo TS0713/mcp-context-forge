@@ -248,7 +248,7 @@ class PromptService:
                 "lastExecutionTime": last_time,
             },
             "tags": db_prompt.tags or [],
-             "visibility": db_prompt.visibility,
+            "visibility": db_prompt.visibility,
             # Include metadata fields for proper API response
             "created_by": getattr(db_prompt, "created_by", None),
             "modified_by": getattr(db_prompt, "modified_by", None),
@@ -274,7 +274,7 @@ class PromptService:
         federation_source: Optional[str] = None,
         team_id: Optional[str] = None,
         owner_email: Optional[str] = None,
-        visibility: str = "private",
+        visibility: Optional[str] = "public",
     ) -> PromptRead:
         """Register a new prompt template.
 
@@ -737,7 +737,7 @@ class PromptService:
 
             if prompt_update.visibility is not None:
                 prompt.visibility = prompt_update.visibility
-                
+
             # Update tags if provided
             if prompt_update.tags is not None:
                 prompt.tags = prompt_update.tags

@@ -1281,7 +1281,7 @@ async def create_server(
     server: ServerCreate,
     request: Request,
     team_id: Optional[str] = Body(None, description="Team ID to assign server to"),
-    visibility: str = Body("private", description="Server visibility: private, team, public"),
+    visibility: Optional[str] = Body("public", description="Server visibility: private, team, public"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user_with_permissions),
 ) -> ServerRead:
@@ -1671,11 +1671,11 @@ async def list_a2a_agents(
 
     logger.debug(f"User {user} requested A2A agent list with team_id={team_id}, visibility={visibility}, tags={tags_list}")
     user_email: Optional[str] = "Unknown"
-    
-    if hasattr(user,"email"):
-        user_email = getattr(user,"email","Unknown")
-    elif isinstance(user,dict):
-        user_email = str(user.get("email","Unknown"))
+
+    if hasattr(user, "email"):
+        user_email = getattr(user, "email", "Unknown")
+    elif isinstance(user, dict):
+        user_email = str(user.get("email", "Unknown"))
     else:
         user_email = "Uknown"
     # Use team-aware filtering
@@ -1717,7 +1717,7 @@ async def create_a2a_agent(
     agent: A2AAgentCreate,
     request: Request,
     team_id: Optional[str] = Body(None, description="Team ID to assign agent to"),
-    visibility: str = Body("private", description="Agent visibility: private, team, public"),
+    visibility: Optional[str] = Body("public", description="Agent visibility: private, team, public"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user_with_permissions),
 ) -> A2AAgentRead:
@@ -2006,7 +2006,7 @@ async def create_tool(
     tool: ToolCreate,
     request: Request,
     team_id: Optional[str] = Body(None, description="Team ID to assign tool to"),
-    visibility: str = Body("private", description="Tool visibility: private, team, public"),
+    visibility: Optional[str] = Body("public", description="Tool visibility: private, team, public"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user_with_permissions),
 ) -> ToolRead:
@@ -2352,7 +2352,7 @@ async def create_resource(
     resource: ResourceCreate,
     request: Request,
     team_id: Optional[str] = Body(None, description="Team ID to assign resource to"),
-    visibility: str = Body("private", description="Resource visibility: private, team, public"),
+    visibility: Optional[str] = Body("public", description="Resource visibility: private, team, public"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user_with_permissions),
 ) -> ResourceRead:
@@ -2669,7 +2669,7 @@ async def create_prompt(
     prompt: PromptCreate,
     request: Request,
     team_id: Optional[str] = Body(None, description="Team ID to assign prompt to"),
-    visibility: str = Body("private", description="Prompt visibility: private, team, public"),
+    visibility: Optional[str] = Body("public", description="Prompt visibility: private, team, public"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user_with_permissions),
 ) -> PromptRead:

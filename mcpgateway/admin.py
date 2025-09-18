@@ -50,8 +50,8 @@ from mcpgateway.db import Tool as DbTool
 from mcpgateway.middleware.rbac import get_current_user_with_permissions, require_permission
 from mcpgateway.models import LogLevel
 from mcpgateway.schemas import (
-    A2AAgentRead,
     A2AAgentCreate,
+    A2AAgentRead,
     GatewayCreate,
     GatewayRead,
     GatewayTestRequest,
@@ -6154,9 +6154,9 @@ async def admin_add_resource(request: Request, db: Session = Depends(get_db), us
             template=cast(str | None, form.get("template")),
             content=str(form["content"]),
             tags=tags,
-            visibility = visibility,
-            team_id = team_id,
-            owner_email = user_email,
+            visibility=visibility,
+            team_id=team_id,
+            owner_email=user_email,
         )
 
         metadata = MetadataCapture.extract_creation_metadata(request, user)
@@ -6674,8 +6674,8 @@ async def admin_add_prompt(request: Request, db: Session = Depends(get_db), user
             arguments=arguments,
             tags=tags,
             visibility=visibility,
-            team_id = team_id,
-            owner_email = user_email,
+            team_id=team_id,
+            owner_email=user_email,
         )
         # Extract creation metadata
         metadata = MetadataCapture.extract_creation_metadata(request, user)
@@ -6728,14 +6728,14 @@ async def admin_edit_prompt(
         user: Authenticated user.
 
     Returns:
-         Response: A JSON response indicating success or failure of the server update operation.
+         JSONResponse: A JSON response indicating success or failure of the server update operation.
 
-    Examples:
+        Examples:
         >>> import asyncio
         >>> from unittest.mock import AsyncMock, MagicMock
         >>> from fastapi import Request
-        >>> from fastapi.responses import RedirectResponse
         >>> from starlette.datastructures import FormData
+        >>> from fastapi.responses import JSONResponse
         >>>
         >>> mock_db = MagicMock()
         >>> mock_user = {"email": "test_user", "db": mock_db}
@@ -6772,7 +6772,7 @@ async def admin_edit_prompt(
         >>>
         >>> async def test_admin_edit_prompt_inactive():
         ...     response = await admin_edit_prompt(prompt_name, mock_request, mock_db, mock_user)
-        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and b"Prompt updated successfully!" in response.body
         >>>
         >>> asyncio.run(test_admin_edit_prompt_inactive())
         True
@@ -6803,7 +6803,7 @@ async def admin_edit_prompt(
             tags=tags,
             visibility=visibility,
             team_id=team_id,
-            user_email = user_email,
+            user_email=user_email,
         )
         await prompt_service.update_prompt(
             db,
@@ -6814,19 +6814,6 @@ async def admin_edit_prompt(
             modified_via=mod_metadata["modified_via"],
             modified_user_agent=mod_metadata["modified_user_agent"],
         )
-
-        '''
-        root_path = request.scope.get("root_path", "")
-        is_inactive_checked: str = str(form.get("is_inactive_checked", "false"))
-        if is_inactive_checked.lower() == "true":
-            return RedirectResponse(f"{root_path}/admin/?include_inactive=true#prompts", status_code=303)
-        # return RedirectResponse(f"{root_path}/admin#prompts", status_code=303)
-        return JSONResponse(
-            content={"message": "Prompt updated successfully!", "success": True},
-            status_code=200,
-        )
-        '''
-
         return JSONResponse(
             content={"message": "Prompt updated successfully!", "success": True},
             status_code=200,
@@ -8407,6 +8394,7 @@ async def admin_list_import_statuses(user=Depends(get_current_user_with_permissi
 #                             A2A AGENT ADMIN ROUTES                          #
 # ============================================================================ #
 
+
 @admin_router.get("/a2a/{agent_id}", response_model=A2AAgentRead)
 async def admin_get_agent(
     agent_id: str,
@@ -8448,13 +8436,19 @@ async def admin_get_agent(
         ...     capabilities={"ping": True}, config={"x": "y"},
         ...     auth_type=None, enabled=True, reachable=True,
         ...     created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
-        ...     last_interaction=None, metrics={"requests": 0}
+        ...     last_interaction=None, metrics = {
+        ...                                           "requests": 0,
+        ...                                           "totalExecutions": 0,
+        ...                                           "successfulExecutions": 0,
+        ...                                           "failedExecutions": 0,
+        ...                                           "failureRate": 0.0,
+        ...                                             }
         ... )
         >>>
-        >>> from mcpgateway.api.routers import admin
-        >>> original_get_agent = a2a_service.get_agent
+        >>> from mcpgateway import admin
+        >>> original_get_agent = admin.a2a_service.get_agent
         >>> a2a_service.get_agent = AsyncMock(return_value=mock_agent)
-        >>>
+        >>> admin.a2a_service.get_agent = AsyncMock(return_value=mock_agent)
         >>> async def test_admin_get_agent_success():
         ...     result = await admin.admin_get_agent(agent_id, mock_db, mock_user)
         ...     return isinstance(result, dict) and result['id'] == agent_id
@@ -8463,7 +8457,7 @@ async def admin_get_agent(
         True
         >>>
         >>> # Test not found
-        >>> a2a_service.get_agent = AsyncMock(side_effect=A2AAgentNotFoundError("Agent not found"))
+        >>> admin.a2a_service.get_agent = AsyncMock(side_effect=A2AAgentNotFoundError("Agent not found"))
         >>> async def test_admin_get_agent_not_found():
         ...     try:
         ...         await admin.admin_get_agent("bad-id", mock_db, mock_user)
@@ -8475,7 +8469,7 @@ async def admin_get_agent(
         True
         >>>
         >>> # Test generic exception
-        >>> a2a_service.get_agent = AsyncMock(side_effect=Exception("Generic error"))
+        >>> admin.a2a_service.get_agent = AsyncMock(side_effect=Exception("Generic error"))
         >>> async def test_admin_get_agent_exception():
         ...     try:
         ...         await admin.admin_get_agent(agent_id, mock_db, mock_user)
@@ -8486,7 +8480,7 @@ async def admin_get_agent(
         >>> asyncio.run(test_admin_get_agent_exception())
         True
         >>>
-        >>> a2a_service.get_agent = original_get_agent
+        >>> admin.a2a_service.get_agent = original_get_agent
     """
     LOGGER.debug(f"User {get_user_email(user)} requested details for agent ID {agent_id}")
     try:
@@ -8497,6 +8491,7 @@ async def admin_get_agent(
     except Exception as e:
         LOGGER.error(f"Error getting agent {agent_id}: {e}")
         raise e
+
 
 @admin_router.get("/a2a")
 async def admin_list_a2a_agents(
@@ -8681,8 +8676,8 @@ async def admin_add_a2a_agent(
             auth_value=form.get("auth_value") if form.get("auth_value") else None,
             tags=tags,
             visibility=form.get("visibility", "private"),
-            team_id = team_id,
-            owner_email = user_email,
+            team_id=team_id,
+            owner_email=user_email,
         )
 
         LOGGER.info(f"Creating A2A agent: {agent_data.name} at {agent_data.endpoint_url}")
@@ -8711,17 +8706,17 @@ async def admin_add_a2a_agent(
             content={"message": "A2A agent created successfully!", "success": True},
             status_code=200,
         )
-    
+
     except CoreValidationError as ex:
         return JSONResponse(content={"message": str(ex), "success": False}, status_code=422)
-    except A2AAgentNameConflictError as e:
-        LOGGER.error(f"A2A agent name conflict: {e}")
+    except A2AAgentNameConflictError as ex:
+        LOGGER.error(f"A2A agent name conflict: {ex}")
         return JSONResponse(content={"message": str(ex), "success": False}, status_code=409)
-    except A2AAgentError as e:
-        LOGGER.error(f"A2A agent error: {e}")
+    except A2AAgentError as ex:
+        LOGGER.error(f"A2A agent error: {ex}")
         return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
-    except ValidationError as e:
-        LOGGER.error(f"Validation error while creating A2A agent: {e}")
+    except ValidationError as ex:
+        LOGGER.error(f"Validation error while creating A2A agent: {ex}")
         return JSONResponse(
             content=ErrorFormatter.format_validation_error(ex),
             status_code=422,
@@ -8731,9 +8726,10 @@ async def admin_add_a2a_agent(
             content=ErrorFormatter.format_database_error(ex),
             status_code=409,
         )
-    except Exception as e:
-        LOGGER.error(f"Error creating A2A agent: {e}")
+    except Exception as ex:
+        LOGGER.error(f"Error creating A2A agent: {ex}")
         return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
+
 
 @admin_router.post("/a2a/{agent_id}/toggle")
 async def admin_toggle_a2a_agent(

@@ -271,7 +271,7 @@ class ResourceService:
         federation_source: Optional[str] = None,
         team_id: Optional[str] = None,
         owner_email: Optional[str] = None,
-        visibility: str = "private",
+        visibility: Optional[str] = "public",
     ) -> ResourceRead:
         """Register a new resource.
 
