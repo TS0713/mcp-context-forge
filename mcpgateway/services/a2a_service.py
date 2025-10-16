@@ -28,7 +28,9 @@ from mcpgateway.schemas import A2AAgentCreate, A2AAgentMetrics, A2AAgentRead, A2
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.team_management_service import TeamManagementService
 from mcpgateway.services.tool_service import ToolService
+
 from mcpgateway.utils.create_slug import slugify
+from mcpgateway.utils.services_auth import decode_auth, encode_auth
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -193,18 +195,37 @@ class A2AAgentService:
                 if existing_agent:
                     raise A2AAgentNameConflictError(name=agent_data.slug, is_active=existing_agent.enabled, agent_id=existing_agent.id, visibility=existing_agent.visibility)
 
+            auth_type = getattr(agent_data, "auth_type", None)
+            # Support multiple custom headers
+            auth_value = getattr(agent_data, "auth_value", {})
+            authentication_headers: Optional[Dict[str, str]] = None
+
+            if hasattr(agent_data, "auth_headers") and agent_data.auth_headers:
+                # Convert list of {key, value} to dict
+                header_dict = {h["key"]: h["value"] for h in agent_data.auth_headers if h.get("key")}
+                # Keep encoded form for persistence, but pass raw headers for initialization
+                auth_value = encode_auth(header_dict)  # Encode the dict for consistency
+                authentication_headers = {str(k): str(v) for k, v in header_dict.items()}
+            elif isinstance(auth_value, str) and auth_value:
+                # Decode persisted auth for initialization
+                decoded = decode_auth(auth_value)
+                authentication_headers = {str(k): str(v) for k, v in decoded.items()}
+            else:
+                authentication_headers = None
+            
+            oauth_config = getattr(agent_data, "oauth_config", None)
+
             # Create new agent
             new_agent = DbA2AAgent(
                 name=agent_data.name,
-                slug=agent_data.slug,
                 description=agent_data.description,
                 endpoint_url=agent_data.endpoint_url,
                 agent_type=agent_data.agent_type,
                 protocol_version=agent_data.protocol_version,
                 capabilities=agent_data.capabilities,
                 config=agent_data.config,
-                auth_type=agent_data.auth_type,
-                auth_value=agent_data.auth_value,  # This should be encrypted in practice
+                auth_type=auth_type,
+                auth_value=auth_value,  # This should be encrypted in practice
                 tags=agent_data.tags,
                 # Team scoping fields - use schema values if provided, otherwise fallback to parameters
                 team_id=getattr(agent_data, "team_id", None) or team_id,
