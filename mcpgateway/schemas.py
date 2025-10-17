@@ -3730,7 +3730,7 @@ class A2AAgentCreate(BaseModel):
         if v is not None:
             return SecurityValidator.validate_uuid(v, "team_id")
         return v
-    
+
     @staticmethod
     def _process_auth_fields(info: ValidationInfo) -> Optional[str]:
         """
@@ -3829,7 +3829,6 @@ class A2AAgentCreate(BaseModel):
             return encode_auth({header_key: header_value})
 
         raise ValueError("Invalid 'auth_type'. Must be one of: basic, bearer, oauth, or headers.")
-
 
 
 class A2AAgentUpdate(BaseModelWithConfigDict):
@@ -4004,7 +4003,7 @@ class A2AAgentRead(BaseModelWithConfigDict):
     - Authentication type: basic, bearer, headers, oauth
     - Authentication value: username/password or token or custom headers
     - OAuth configuration for OAuth 2.0 authentication
-    
+
     Auto Populated fields:
     - Authentication username: for basic auth
     - Authentication password: for basic auth

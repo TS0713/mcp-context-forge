@@ -2478,7 +2478,7 @@ class Gateway(Base):
     oauth_tokens: Mapped[List["OAuthToken"]] = relationship("OAuthToken", back_populates="gateway", cascade="all, delete-orphan")
 
     # Relationship with registered OAuth clients (DCR)
-    
+
     registered_oauth_clients: Mapped[List["RegisteredOAuthClient"]] = relationship("RegisteredOAuthClient", back_populates="gateway", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -2548,7 +2548,7 @@ class A2AAgent(Base):
 
     # Configuration
     config: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    
+
     # Authorizations
     auth_type: Mapped[Optional[str]] = mapped_column(String(20), default=None)  # "basic", "bearer", "headers", "oauth" or None
     auth_value: Mapped[Optional[Dict[str, str]]] = mapped_column(JSON)
@@ -2591,10 +2591,10 @@ class A2AAgent(Base):
     metrics: Mapped[List["A2AAgentMetric"]] = relationship("A2AAgentMetric", back_populates="a2a_agent", cascade="all, delete-orphan")
 
     # Relationship with OAuth tokens
-    #oauth_tokens: Mapped[List["OAuthToken"]] = relationship("OAuthToken", back_populates="gateway", cascade="all, delete-orphan")
+    # oauth_tokens: Mapped[List["OAuthToken"]] = relationship("OAuthToken", back_populates="gateway", cascade="all, delete-orphan")
 
     # Relationship with registered OAuth clients (DCR)
-    #registered_oauth_clients: Mapped[List["RegisteredOAuthClient"]] = relationship("RegisteredOAuthClient", back_populates="gateway", cascade="all, delete-orphan")
+    # registered_oauth_clients: Mapped[List["RegisteredOAuthClient"]] = relationship("RegisteredOAuthClient", back_populates="gateway", cascade="all, delete-orphan")
 
     @property
     def execution_count(self) -> int:

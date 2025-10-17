@@ -27,9 +27,8 @@ from mcpgateway.schemas import A2AAgentCreate, A2AAgentMetrics, A2AAgentRead, A2
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.team_management_service import TeamManagementService
 from mcpgateway.services.tool_service import ToolService
-
 from mcpgateway.utils.create_slug import slugify
-from mcpgateway.utils.services_auth import decode_auth, encode_auth
+from mcpgateway.utils.services_auth import encode_auth  # ,decode_auth
 
 # Initialize logging service first
 logging_service = LoggingService()
@@ -180,7 +179,7 @@ class A2AAgentService:
             slug_name = slugify(agent_data.name)
 
             if visibility.lower() == "public":
-                #existing_query = select(DbA2AAgent).where(DbA2AAgent.name == agent_data.name)
+                # existing_query = select(DbA2AAgent).where(DbA2AAgent.name == agent_data.name)
                 existing_agent = db.execute(select(DbA2AAgent).where(DbA2AAgent.slug == slug_name, DbA2AAgent.visibility == "public")).scalar_one_or_none()
                 if existing_agent:
                     raise A2AAgentNameConflictError(name=agent_data.name, is_active=existing_agent.enabled, agent_id=existing_agent.id)
@@ -192,21 +191,24 @@ class A2AAgentService:
             auth_type = getattr(agent_data, "auth_type", None)
             # Support multiple custom headers
             auth_value = getattr(agent_data, "auth_value", {})
-            authentication_headers: Optional[Dict[str, str]] = None
+
+            # authentication_headers: Optional[Dict[str, str]] = None
 
             if hasattr(agent_data, "auth_headers") and agent_data.auth_headers:
                 # Convert list of {key, value} to dict
                 header_dict = {h["key"]: h["value"] for h in agent_data.auth_headers if h.get("key")}
                 # Keep encoded form for persistence, but pass raw headers for initialization
                 auth_value = encode_auth(header_dict)  # Encode the dict for consistency
-                authentication_headers = {str(k): str(v) for k, v in header_dict.items()}
-            elif isinstance(auth_value, str) and auth_value:
-                # Decode persisted auth for initialization
-                decoded = decode_auth(auth_value)
-                authentication_headers = {str(k): str(v) for k, v in decoded.items()}
+
+                # authentication_headers = {str(k): str(v) for k, v in header_dict.items()}
+            # elif isinstance(auth_value, str) and auth_value:
+            #    # Decode persisted auth for initialization
+            #    decoded = decode_auth(auth_value)
+            # authentication_headers = {str(k): str(v) for k, v in decoded.items()}
             else:
-                authentication_headers = None
-            
+                #    #authentication_headers = None
+                auth_value = {}
+
             oauth_config = getattr(agent_data, "oauth_config", None)
 
             # Create new agent
@@ -220,6 +222,7 @@ class A2AAgentService:
                 config=agent_data.config,
                 auth_type=auth_type,
                 auth_value=auth_value,  # This should be encrypted in practice
+                oauth_config=oauth_config,
                 tags=agent_data.tags,
                 # Team scoping fields - use schema values if provided, otherwise fallback to parameters
                 team_id=getattr(agent_data, "team_id", None) or team_id,
@@ -251,8 +254,7 @@ class A2AAgentService:
             logger.info(f"Registered new A2A agent: {new_agent.name} (ID: {new_agent.id})")
             return self._db_to_schema(new_agent)
         except Exception as e:
-            print ("A2A Agent Registration Error: ",str(e))
-            logger.error(f"Error: {str(e)}",exc_info=True)
+            logger.error(f"Error: {str(e)}", exc_info=True)
 
     async def list_agents(self, db: Session, cursor: Optional[str] = None, include_inactive: bool = False, tags: Optional[List[str]] = None) -> List[A2AAgentRead]:  # pylint: disable=unused-argument
         """List A2A agents with optional filtering.
