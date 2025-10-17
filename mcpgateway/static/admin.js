@@ -274,7 +274,7 @@ function extractContent(content, fallback = "") {
  * SECURITY: Validate URL inputs
  */
 function validateUrl(url) {
-    
+
     if (!url || typeof url !== "string") {
         return { valid: false, error: "URL is required" };
     }
@@ -2768,7 +2768,7 @@ async function viewAgent(agentId) {
             console.warn("Modal was still hidden — forcing visible.");
             modal.classList.remove("hidden");
         }
-        
+
         console.log("✓ Agent details loaded successfully");
     } catch (error) {
         console.error("Error fetching agent details:", error);
@@ -2794,7 +2794,7 @@ async function editA2AAgent(agentId) {
         }
 
     const agent = await response.json();
-    
+
     console.log("Agent Details: " + JSON.stringify(agent, null, 2));
 
    // for (const [key, value] of Object.entries(agent)) {
@@ -2817,7 +2817,7 @@ async function editA2AAgent(agentId) {
     hiddenField.value = isInactiveCheckedBool;
 
     // Set form action and populate fields with validation
-    
+
     if (editForm) {
       editForm.action = `${window.ROOT_PATH}/admin/a2a/${agentId}/edit`;
       editForm.method = "POST"; // ensure method is POST
@@ -2830,7 +2830,7 @@ async function editA2AAgent(agentId) {
     const urlField = safeGetElement("a2a-agent-endpoint-url-edit");
     const descField = safeGetElement("a2a-agent-description-edit");
     const agentType = safeGetElement("a2a-agent-type-edit");
-    
+
     agentType.value = agent.agentType;
 
     console.log("Agent Type: ",agent.agentType);
@@ -9074,7 +9074,7 @@ async function handleA2AFormSubmit(e) {
                 console.error("Invalid auth_headers JSON:", e);
             }
         }
-        
+
         const authType = formData.get("auth_type");
         if (authType !== "oauth") {
             formData.set("oauth_grant_type", "");
@@ -9379,7 +9379,7 @@ async function handleEditA2AAgentFormSubmit(e) {
 
     console.log("Edit A2A Agent Form Details: ")
     console.log(JSON.stringify(Object.fromEntries(formData.entries()), null, 2));
-    
+
     try {
         // Validate form inputs
         const name = formData.get("name");
@@ -11455,7 +11455,7 @@ function filterEntitiesByTags(entityType, tagsInput) {
     if (entityType === "a2a-agents") {
 
         const panel = document.querySelector(`#${entityType}-panel`);
-        rows = panel.querySelectorAll(".border.rounded-lg.p-4"); 
+        rows = panel.querySelectorAll(".border.rounded-lg.p-4");
         // 👆 adjust selector if your agent cards have different class names
     } else {
         const tableSelector = `#${entityType}-panel tbody tr`;
@@ -11497,7 +11497,7 @@ function filterEntitiesByTags(entityType, tagsInput) {
             span.inline-flex.items-center.px-2\\.5.py-0\\.5.rounded-full.text-xs.font-medium.bg-gray-100.text-gray-700
         `);
 
-        
+
         tagElements.forEach((tagEl) => {
             const tagText = tagEl.textContent.trim().toLowerCase();
             // Filter out any remaining non-tag content

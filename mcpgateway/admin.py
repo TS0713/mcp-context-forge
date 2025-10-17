@@ -9537,7 +9537,7 @@ async def admin_add_a2a_agent(
             content={"message": "A2A features are disabled!", "success": False},
             status_code=403,
         )
-    
+
     form = await request.form()
     try:
         LOGGER.info(f"A2A agent creation form data: {dict(form)}")
@@ -9561,7 +9561,7 @@ async def admin_add_a2a_agent(
                 auth_headers = json.loads(auth_headers_json)
             except (json.JSONDecodeError, ValueError):
                 auth_headers = []
-        
+
         # Parse OAuth configuration - support both JSON string and individual form fields
         oauth_config_json = str(form.get("oauth_config"))
         oauth_config: Optional[dict[str, Any]] = None
@@ -9630,8 +9630,8 @@ async def admin_add_a2a_agent(
                 LOGGER.info(f"✅ Assembled OAuth config from UI form fields: grant_type={oauth_grant_type}, issuer={oauth_issuer}")
                 LOGGER.info(f"DEBUG: Complete oauth_config = {oauth_config}")
 
-        ## TODO ##
-        ## Handle passthrough_headers
+        # TODO
+        # Handle passthrough_headers
 
         # Auto-detect OAuth: if oauth_config is present and auth_type not explicitly set, use "oauth"
         auth_type_from_form = str(form.get("auth_type", ""))
@@ -9717,7 +9717,80 @@ async def admin_edit_a2a_agent(
     db: Session = Depends(get_db),
     user=Depends(get_current_user_with_permissions),
 ) -> JSONResponse:
-    """Edit an existing A2A agent via the admin UI."""
+    """
+    Edit an existing A2A agent via the admin UI.
+
+    Expects form fields:
+      - name
+      - description (optional)
+      - endpoint_url
+      - agent_type
+      - tags (optional, comma-separated)
+      - auth_type (optional)
+      - auth_username (optional)
+      - auth_password (optional)
+      - auth_token (optional)
+      - auth_header_key / auth_header_value (optional)
+      - auth_headers (JSON array, optional)
+      - oauth_config (JSON string or individual OAuth fields)
+      - visibility (optional)
+      - team_id (optional)
+      - capabilities (JSON, optional)
+      - config (JSON, optional)
+
+    Args:
+        agent_id (str): The ID of the agent being edited.
+        request (Request): The incoming FastAPI request containing form data.
+        db (Session): Active database session.
+        user: The authenticated admin user performing the edit.
+
+    Returns:
+        JSONResponse: A JSON response indicating success or failure.
+
+    Example:
+    >>> import asyncio, json
+    >>> from unittest.mock import AsyncMock, MagicMock
+    >>> from fastapi import Request
+    >>> from fastapi.responses import JSONResponse
+    >>> from starlette.datastructures import FormData
+    >>> import types, mcpgateway.admin as admin_mod
+    >>> mock_db = MagicMock()
+    >>> mock_user = {"email": "test@example.com"}
+    >>> agent_id = "agent-123"
+    >>> form_data_success = FormData([
+    ...     ("name", "Updated Agent"),
+    ...     ("endpoint_url", "http://example.com/agent"),
+    ...     ("agent_type", "generic"),
+    ...     ("auth_type", "basic"),
+    ...     ("auth_username", "user"),
+    ...     ("auth_password", "pass"),
+    ... ])
+    >>> mock_request_success = MagicMock(spec=Request, scope={"root_path": ""})
+    >>> mock_request_success.form = AsyncMock(return_value=form_data_success)
+    >>> admin_mod.get_user_email = lambda u: u["email"]
+    >>> admin_mod.get_oauth_encryption = lambda secret: types.SimpleNamespace(encrypt_secret=lambda s: f"enc({s})")
+    >>> admin_mod.settings = types.SimpleNamespace(auth_encryption_secret="dummy-secret")
+    >>> admin_mod.LOGGER = MagicMock()
+    >>> admin_mod.TeamManagementService = lambda db: types.SimpleNamespace(
+    ...     verify_team_for_user=AsyncMock(return_value="11111111-1111-1111-1111-111111111111")
+    ... )
+    >>> admin_mod.MetadataCapture = types.SimpleNamespace(extract_modification_metadata=lambda req, u, _: {
+    ...     "modified_by": "test@example.com",
+    ...     "modified_from_ip": "127.0.0.1",
+    ...     "modified_via": "UI",
+    ...     "modified_user_agent": "pytest"
+    ... })
+    >>> admin_mod.a2a_service = types.SimpleNamespace(update_agent=AsyncMock(return_value=True))
+    >>>
+    >>> async def test_admin_edit_a2a_agent_success():
+    ...     response = await admin_mod.admin_edit_a2a_agent(agent_id, mock_request_success, mock_db, mock_user)
+    ...     body = json.loads(response.body)
+    ...     return isinstance(response, JSONResponse) and response.status_code == 200 and body["success"] is True
+    >>>
+    >>> asyncio.run(test_admin_edit_a2a_agent_success())
+    True
+    """
+
     try:
         form = await request.form()
 
@@ -9729,7 +9802,7 @@ async def admin_edit_a2a_agent(
         visibility = str(form.get("visibility", "private"))
 
         # Agent Type
-        agent_type = str(form.get("agent_type","generic"))
+        agent_type = str(form.get("agent_type", "generic"))
 
         # Capabilities
         raw_capabilities = form.get("capabilities")
@@ -9748,7 +9821,7 @@ async def admin_edit_a2a_agent(
                 config = json.loads(raw_config)
             except (ValueError, json.JSONDecodeError):
                 config = {}
-                
+
         # Parse auth_headers JSON if present
         auth_headers_json = str(form.get("auth_headers"))
         auth_headers = []
@@ -9758,7 +9831,7 @@ async def admin_edit_a2a_agent(
             except (json.JSONDecodeError, ValueError):
                 auth_headers = []
 
-        '''
+        """
         # Passthrough headers
         passthrough_headers = None
         if form.get("passthrough_headers"):
@@ -9768,7 +9841,7 @@ async def admin_edit_a2a_agent(
             except (ValueError, json.JSONDecodeError):
                 passthrough_headers = [h.strip() for h in raw.split(",") if h.strip()]
 
-        '''
+        """
 
         # Parse OAuth configuration - support both JSON string and individual form fields
         oauth_config_json = str(form.get("oauth_config"))
@@ -9834,7 +9907,6 @@ async def admin_edit_a2a_agent(
 
                 LOGGER.info(f"✅ Assembled OAuth config from UI form fields (edit): grant_type={oauth_grant_type}, issuer={oauth_issuer}")
 
-
         user_email = get_user_email(user)
         team_service = TeamManagementService(db)
         team_id = await team_service.verify_team_for_user(user_email, form.get("team_id"))
@@ -9845,12 +9917,11 @@ async def admin_edit_a2a_agent(
             auth_type_from_form = "oauth"
             LOGGER.info("Auto-detected OAuth configuration in edit, setting auth_type='oauth'")
 
-
         agent_update = A2AAgentUpdate(
             name=form.get("name"),
             description=form.get("description"),
             endpoint_url=form.get("endpoint_url"),
-            agent_type = agent_type,
+            agent_type=agent_type,
             tags=tags,
             auth_type=auth_type_from_form,
             auth_username=str(form.get("auth_username", "")),
@@ -9865,7 +9936,7 @@ async def admin_edit_a2a_agent(
             team_id=team_id,
             owner_email=user_email,
             capabilities=capabilities,  # Optional, not editable via UI
-            config=config,        # Optional, not editable via UI
+            config=config,  # Optional, not editable via UI
         )
 
         mod_metadata = MetadataCapture.extract_modification_metadata(request, user, 0)
