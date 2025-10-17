@@ -322,7 +322,6 @@ def rate_limit(requests_per_minute: Optional[int] = None):
 
     return decorator
 
-
 def get_user_email(user) -> str:
     """Extract user email from JWT payload consistently.
 
@@ -390,12 +389,17 @@ def get_user_email(user) -> str:
     """
     if isinstance(user, dict):
         # Standard JWT format - try 'sub' first, then 'email'
-        return user.get("sub") or user.get("email", "unknown")
+        return user.get("sub") or user.get("email") or "unknown"
+
     if hasattr(user, "email"):
         # User object with email attribute
         return user.email
-    # Fallback to string representation
-    return str(user) if user else "unknown"
+
+    # Fallback to string representation, but None becomes "unknown"
+    if user is None:
+        return "unknown"
+
+    return str(user)
 
 
 def serialize_datetime(obj):
@@ -6434,7 +6438,10 @@ async def admin_edit_gateway(
         >>>
         >>> async def test_admin_edit_gateway_success():
         ...     response = await admin_edit_gateway(gateway_id, mock_request_success, mock_db, mock_user)
-        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and json.loads(response.body)["success"] is True
+        ...     #print("Response:", response)
+        ...     #print("Status code:", response.status_code)
+        ...     #print("Body:", response.body)
+        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and json.loads(response.body)["success"]
         >>>
         >>> asyncio.run(test_admin_edit_gateway_success())
         True

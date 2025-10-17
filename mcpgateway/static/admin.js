@@ -274,7 +274,6 @@ function extractContent(content, fallback = "") {
  * SECURITY: Validate URL inputs
  */
 function validateUrl(url) {
-
     if (!url || typeof url !== "string") {
         return { valid: false, error: "URL is required" };
     }
@@ -700,7 +699,6 @@ function resetModalState(modalId) {
         console.error(`Error resetting modal state ${modalId}:`, error);
     }
 }
-
 
 // ===================================================================
 // ENHANCED METRICS LOADING with Retry Logic and Request Deduplication
@@ -2782,97 +2780,97 @@ async function viewAgent(agentId) {
  */
 
 async function editA2AAgent(agentId) {
-  try {
-    console.log(`Editing A2A Agent ID: ${agentId}`);
+    try {
+        console.log(`Editing A2A Agent ID: ${agentId}`);
 
-    const response = await fetchWithTimeout(
+        const response = await fetchWithTimeout(
             `${window.ROOT_PATH}/admin/a2a/${agentId}`,
         );
 
-    if (!response.ok) {
+        if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-    const agent = await response.json();
+        const agent = await response.json();
 
-    console.log("Agent Details: " + JSON.stringify(agent, null, 2));
+        console.log("Agent Details: " + JSON.stringify(agent, null, 2));
 
-   // for (const [key, value] of Object.entries(agent)) {
-     //       console.log(`${key}:`, value);
-       //     }
+        // for (const [key, value] of Object.entries(agent)) {
+        //       console.log(`${key}:`, value);
+        //     }
 
-    const isInactiveCheckedBool = isInactiveChecked("a2a-agents");
-    const editForm = safeGetElement("edit-a2a-agent-form");
-    let hiddenField = safeGetElement("edit-a2a-agents-show-inactive");
-    if (!hiddenField){
-        hiddenField = document.createElement("input");
-        hiddenField.type = "hidden";
-        hiddenField.name = "is_inactivate_checked";
-        hiddenField.id = "edit-a2a-agents-show-inactive";
+        const isInactiveCheckedBool = isInactiveChecked("a2a-agents");
+        const editForm = safeGetElement("edit-a2a-agent-form");
+        let hiddenField = safeGetElement("edit-a2a-agents-show-inactive");
+        if (!hiddenField) {
+            hiddenField = document.createElement("input");
+            hiddenField.type = "hidden";
+            hiddenField.name = "is_inactivate_checked";
+            hiddenField.id = "edit-a2a-agents-show-inactive";
+
+            if (editForm) {
+                editForm.appendChild(hiddenField);
+            }
+        }
+        hiddenField.value = isInactiveCheckedBool;
+
+        // Set form action and populate fields with validation
 
         if (editForm) {
-            editForm.appendChild(hiddenField);
+            editForm.action = `${window.ROOT_PATH}/admin/a2a/${agentId}/edit`;
+            editForm.method = "POST"; // ensure method is POST
         }
-    }
-    hiddenField.value = isInactiveCheckedBool;
 
-    // Set form action and populate fields with validation
+        const nameValidation = validateInputName(agent.name, "a2a_agent");
+        const urlValidation = validateUrl(agent.endpointUrl);
 
-    if (editForm) {
-      editForm.action = `${window.ROOT_PATH}/admin/a2a/${agentId}/edit`;
-      editForm.method = "POST"; // ensure method is POST
-    }
+        const nameField = safeGetElement("a2a-agent-name-edit");
+        const urlField = safeGetElement("a2a-agent-endpoint-url-edit");
+        const descField = safeGetElement("a2a-agent-description-edit");
+        const agentType = safeGetElement("a2a-agent-type-edit");
 
-    const nameValidation = validateInputName(agent.name,"a2a_agent");
-    const urlValidation = validateUrl(agent.endpointUrl)
+        agentType.value = agent.agentType;
 
-    const nameField = safeGetElement("a2a-agent-name-edit");
-    const urlField = safeGetElement("a2a-agent-endpoint-url-edit");
-    const descField = safeGetElement("a2a-agent-description-edit");
-    const agentType = safeGetElement("a2a-agent-type-edit");
+        console.log("Agent Type: ", agent.agentType);
 
-    agentType.value = agent.agentType;
-
-    console.log("Agent Type: ",agent.agentType);
-
-    if (nameField && nameValidation.valid) {
+        if (nameField && nameValidation.valid) {
             nameField.value = nameValidation.value;
         }
-    if (urlField && urlValidation.valid) {
-        urlField.value = urlValidation.value;
-    }
-    if (descField) {
-        descField.value = agent.description || "";
-    }
+        if (urlField && urlValidation.valid) {
+            urlField.value = urlValidation.value;
+        }
+        if (descField) {
+            descField.value = agent.description || "";
+        }
 
-    // Set tags field
-    const tagsField = safeGetElement("a2a-agent-tags-edit");
-    if (tagsField) {
-        tagsField.value = agent.tags ? agent.tags.join(", ") : "";
-    }
+        // Set tags field
+        const tagsField = safeGetElement("a2a-agent-tags-edit");
+        if (tagsField) {
+            tagsField.value = agent.tags ? agent.tags.join(", ") : "";
+        }
 
-    const teamId = new URL(window.location.href).searchParams.get(
+        const teamId = new URL(window.location.href).searchParams.get(
             "team_id",
-    );
+        );
 
-    if (teamId) {
+        if (teamId) {
             const hiddenInput = document.createElement("input");
             hiddenInput.type = "hidden";
             hiddenInput.name = "team_id";
             hiddenInput.value = teamId;
             editForm.appendChild(hiddenInput);
-    }
+        }
 
-    // ✅ Prefill visibility radios (consistent with server)
-    const visibility = agent.visibility
-        ? agent.visibility.toLowerCase()
-        : null;
+        // ✅ Prefill visibility radios (consistent with server)
+        const visibility = agent.visibility
+            ? agent.visibility.toLowerCase()
+            : null;
 
-    const publicRadio = safeGetElement("a2a-visibility-public-edit");
-    const teamRadio = safeGetElement("a2a-visibility-team-edit");
-    const privateRadio = safeGetElement("a2a-visibility-private-edit");
+        const publicRadio = safeGetElement("a2a-visibility-public-edit");
+        const teamRadio = safeGetElement("a2a-visibility-team-edit");
+        const privateRadio = safeGetElement("a2a-visibility-private-edit");
 
-    // Clear all first
+        // Clear all first
         if (publicRadio) {
             publicRadio.checked = false;
         }
@@ -2883,206 +2881,212 @@ async function editA2AAgent(agentId) {
             privateRadio.checked = false;
         }
 
-    if (visibility) {
-        // Check visibility and set the corresponding radio button
-        if (visibility === "public" && publicRadio) {
-            publicRadio.checked  = true;
-        } else if (visibility === "team" && teamRadio) {
-            teamRadio.checked = true;
-        } else if (visibility === "private" && privateRadio) {
-            privateRadio.checked = true;
+        if (visibility) {
+            // Check visibility and set the corresponding radio button
+            if (visibility === "public" && publicRadio) {
+                publicRadio.checked = true;
+            } else if (visibility === "team" && teamRadio) {
+                teamRadio.checked = true;
+            } else if (visibility === "private" && privateRadio) {
+                privateRadio.checked = true;
+            }
         }
-    }
 
-    const authTypeField = safeGetElement("auth-type-a2a-edit");
+        const authTypeField = safeGetElement("auth-type-a2a-edit");
 
-    if (authTypeField) {
-        authTypeField.value = agent.authType || "";
-    }
+        if (authTypeField) {
+            authTypeField.value = agent.authType || "";
+        }
 
-    toggleA2AAuthFields(agent.authType || "");
+        toggleA2AAuthFields(agent.authType || "");
 
-    // Auth containers
-    const authBasicSection = safeGetElement("auth-basic-fields-a2a-edit");
-    const authBearerSection = safeGetElement("auth-bearer-fields-a2a-edit");
-    const authHeadersSection = safeGetElement(
-        "auth-headers-fields-a2a-edit",
-    );
-    const authOAuthSection = safeGetElement("auth-oauth-fields-a2a-edit");
+        // Auth containers
+        const authBasicSection = safeGetElement("auth-basic-fields-a2a-edit");
+        const authBearerSection = safeGetElement("auth-bearer-fields-a2a-edit");
+        const authHeadersSection = safeGetElement(
+            "auth-headers-fields-a2a-edit",
+        );
+        const authOAuthSection = safeGetElement("auth-oauth-fields-a2a-edit");
 
-    // Individual fields
-    const authUsernameField = safeGetElement(
-        "auth-basic-fields-a2a-edit",
-    )?.querySelector("input[name='auth_username']");
-    const authPasswordField = safeGetElement(
-        "auth-basic-fields-a2a-edit",
-    )?.querySelector("input[name='auth_password']");
+        // Individual fields
+        const authUsernameField = safeGetElement(
+            "auth-basic-fields-a2a-edit",
+        )?.querySelector("input[name='auth_username']");
+        const authPasswordField = safeGetElement(
+            "auth-basic-fields-a2a-edit",
+        )?.querySelector("input[name='auth_password']");
 
-    const authTokenField = safeGetElement(
-        "auth-bearer-fields-a2a-edit",
-    )?.querySelector("input[name='auth_token']");
+        const authTokenField = safeGetElement(
+            "auth-bearer-fields-a2a-edit",
+        )?.querySelector("input[name='auth_token']");
 
-    const authHeaderKeyField = safeGetElement(
-        "auth-headers-fields-a2a-edit",
-    )?.querySelector("input[name='auth_header_key']");
-    const authHeaderValueField = safeGetElement(
-        "auth-headers-fields-a2a-edit",
-    )?.querySelector("input[name='auth_header_value']");
+        const authHeaderKeyField = safeGetElement(
+            "auth-headers-fields-a2a-edit",
+        )?.querySelector("input[name='auth_header_key']");
+        const authHeaderValueField = safeGetElement(
+            "auth-headers-fields-a2a-edit",
+        )?.querySelector("input[name='auth_header_value']");
 
-    // OAuth fields
-    const oauthGrantTypeField = safeGetElement("oauth-grant-type-a2a-edit");
-    const oauthClientIdField = safeGetElement("oauth-client-id-a2a-edit");
-    const oauthClientSecretField = safeGetElement(
-        "oauth-client-secret-a2a-edit",
-    );
-    const oauthTokenUrlField = safeGetElement("oauth-token-url-a2a-edit");
-    const oauthAuthUrlField = safeGetElement(
-        "oauth-authorization-url-a2a-edit",
-    );
-    const oauthRedirectUriField = safeGetElement(
-        "oauth-redirect-uri-a2a-edit",
-    );
-    const oauthScopesField = safeGetElement("oauth-scopes-a2a-edit");
-    const oauthAuthCodeFields = safeGetElement(
-        "oauth-auth-code-fields-a2a-edit",
-    );
+        // OAuth fields
+        const oauthGrantTypeField = safeGetElement("oauth-grant-type-a2a-edit");
+        const oauthClientIdField = safeGetElement("oauth-client-id-a2a-edit");
+        const oauthClientSecretField = safeGetElement(
+            "oauth-client-secret-a2a-edit",
+        );
+        const oauthTokenUrlField = safeGetElement("oauth-token-url-a2a-edit");
+        const oauthAuthUrlField = safeGetElement(
+            "oauth-authorization-url-a2a-edit",
+        );
+        const oauthRedirectUriField = safeGetElement(
+            "oauth-redirect-uri-a2a-edit",
+        );
+        const oauthScopesField = safeGetElement("oauth-scopes-a2a-edit");
+        const oauthAuthCodeFields = safeGetElement(
+            "oauth-auth-code-fields-a2a-edit",
+        );
 
-    // Hide all auth sections first
-    if (authBasicSection) {
-        authBasicSection.style.display = "none";
-    }
-    if (authBearerSection) {
-        authBearerSection.style.display = "none";
-    }
-    if (authHeadersSection) {
-        authHeadersSection.style.display = "none";
-    }
-    if (authOAuthSection) {
-        authOAuthSection.style.display = "none";
-    }
+        // Hide all auth sections first
+        if (authBasicSection) {
+            authBasicSection.style.display = "none";
+        }
+        if (authBearerSection) {
+            authBearerSection.style.display = "none";
+        }
+        if (authHeadersSection) {
+            authHeadersSection.style.display = "none";
+        }
+        if (authOAuthSection) {
+            authOAuthSection.style.display = "none";
+        }
 
-    switch (agent.authType) {
-        case "basic":
-            if (authBasicSection) {
-                authBasicSection.style.display = "block";
-                if (authUsernameField) {
-                    authUsernameField.value = agent.authUsername || "";
-                }
-                if (authPasswordField) {
-                    authPasswordField.value = "*****"; // mask password
-                }
-            }
-            break;
-        case "bearer":
-            if (authBearerSection) {
-                authBearerSection.style.display = "block";
-                if (authTokenField) {
-                    authTokenField.value = agent.authValue || ""; // show full token
-                }
-            }
-            break;
-        case "authheaders":
-            if (authHeadersSection) {
-                authHeadersSection.style.display = "block";
-                if (authHeaderKeyField) {
-                    authHeaderKeyField.value = agent.authHeaderKey || "";
-                }
-                if (authHeaderValueField) {
-                    authHeaderValueField.value = "*****"; // mask header value
-                }
-            }
-            break;
-        case "oauth":
-            if (authOAuthSection) {
-                authOAuthSection.style.display = "block";
-            }
-            // Populate OAuth fields if available
-            if (agent.oauthConfig) {
-                const config = agent.oauthConfig;
-                if (oauthGrantTypeField && config.grant_type) {
-                    oauthGrantTypeField.value = config.grant_type;
-                    // Show/hide authorization code fields based on grant type
-                    if (oauthAuthCodeFields) {
-                        oauthAuthCodeFields.style.display =
-                            config.grant_type === "authorization_code"
-                                ? "block"
-                                : "none";
+        switch (agent.authType) {
+            case "basic":
+                if (authBasicSection) {
+                    authBasicSection.style.display = "block";
+                    if (authUsernameField) {
+                        authUsernameField.value = agent.authUsername || "";
+                    }
+                    if (authPasswordField) {
+                        authPasswordField.value = "*****"; // mask password
                     }
                 }
-                if (oauthClientIdField && config.client_id) {
-                    oauthClientIdField.value = config.client_id;
+                break;
+            case "bearer":
+                if (authBearerSection) {
+                    authBearerSection.style.display = "block";
+                    if (authTokenField) {
+                        authTokenField.value = agent.authValue || ""; // show full token
+                    }
                 }
-                if (oauthClientSecretField) {
-                    oauthClientSecretField.value = ""; // Don't populate secret for security
+                break;
+            case "authheaders":
+                if (authHeadersSection) {
+                    authHeadersSection.style.display = "block";
+                    if (authHeaderKeyField) {
+                        authHeaderKeyField.value = agent.authHeaderKey || "";
+                    }
+                    if (authHeaderValueField) {
+                        authHeaderValueField.value = "*****"; // mask header value
+                    }
                 }
-                if (oauthTokenUrlField && config.token_url) {
-                    oauthTokenUrlField.value = config.token_url;
+                break;
+            case "oauth":
+                if (authOAuthSection) {
+                    authOAuthSection.style.display = "block";
                 }
-                if (oauthAuthUrlField && config.authorization_url) {
-                    oauthAuthUrlField.value = config.authorization_url;
+                // Populate OAuth fields if available
+                if (agent.oauthConfig) {
+                    const config = agent.oauthConfig;
+                    if (oauthGrantTypeField && config.grant_type) {
+                        oauthGrantTypeField.value = config.grant_type;
+                        // Show/hide authorization code fields based on grant type
+                        if (oauthAuthCodeFields) {
+                            oauthAuthCodeFields.style.display =
+                                config.grant_type === "authorization_code"
+                                    ? "block"
+                                    : "none";
+                        }
+                    }
+                    if (oauthClientIdField && config.client_id) {
+                        oauthClientIdField.value = config.client_id;
+                    }
+                    if (oauthClientSecretField) {
+                        oauthClientSecretField.value = ""; // Don't populate secret for security
+                    }
+                    if (oauthTokenUrlField && config.token_url) {
+                        oauthTokenUrlField.value = config.token_url;
+                    }
+                    if (oauthAuthUrlField && config.authorization_url) {
+                        oauthAuthUrlField.value = config.authorization_url;
+                    }
+                    if (oauthRedirectUriField && config.redirect_uri) {
+                        oauthRedirectUriField.value = config.redirect_uri;
+                    }
+                    if (
+                        oauthScopesField &&
+                        config.scopes &&
+                        Array.isArray(config.scopes)
+                    ) {
+                        oauthScopesField.value = config.scopes.join(" ");
+                    }
                 }
-                if (oauthRedirectUriField && config.redirect_uri) {
-                    oauthRedirectUriField.value = config.redirect_uri;
-                }
-                if (
-                    oauthScopesField &&
-                    config.scopes &&
-                    Array.isArray(config.scopes)
-                ) {
-                    oauthScopesField.value = config.scopes.join(" ");
-                }
-            }
-            break;
-        case "":
-        default:
-            // No auth – keep everything hidden
-            break;
+                break;
+            case "":
+            default:
+                // No auth – keep everything hidden
+                break;
+        }
+
+        // **Capabilities & Config (ensure valid dicts)**
+        safeSetValue(
+            "a2a-agent-capabilities-edit",
+            JSON.stringify(agent.capabilities || {}),
+        );
+        safeSetValue(
+            "a2a-agent-config-edit",
+            JSON.stringify(agent.config || {}),
+        );
+
+        // Set form action to the new POST endpoint
+
+        openModal("a2a-edit-modal");
+        console.log("✓ A2A Agent edit modal loaded successfully");
+    } catch (err) {
+        console.error("Error loading A2A agent:", err);
+        const errorMessage = handleFetchError(
+            err,
+            "load A2A Agent for editing",
+        );
+        showErrorMessage(errorMessage);
     }
-
-    // **Capabilities & Config (ensure valid dicts)**
-    safeSetValue(
-      "a2a-agent-capabilities-edit",
-      JSON.stringify(agent.capabilities || {})
-    );
-    safeSetValue(
-      "a2a-agent-config-edit",
-      JSON.stringify(agent.config || {})
-    );
-
-    // Set form action to the new POST endpoint
-
-    openModal("a2a-edit-modal");
-    console.log("✓ A2A Agent edit modal loaded successfully");
-  } catch (err) {
-    console.error("Error loading A2A agent:", err);
-    const errorMessage = handleFetchError(
-      err,
-      "load A2A Agent for editing"
-    );
-    showErrorMessage(errorMessage);
-  }
 }
 
 function safeSetValue(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.value = val;
+    const el = document.getElementById(id);
+    if (el) {
+        el.value = val;
+    }
 }
 
 function toggleA2AAuthFields(authType) {
-  const sections = [
-    "auth-basic-fields-a2a-edit",
-    "auth-bearer-fields-a2a-edit",
-    "auth-headers-fields-a2a-edit",
-    "auth-oauth-fields-a2a-edit"
-  ];
-  sections.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = "none";
-  });
-  if (authType) {
-    const el = document.getElementById(`auth-${authType}-fields-a2a-edit`);
-    if (el) el.style.display = "block";
-  }
+    const sections = [
+        "auth-basic-fields-a2a-edit",
+        "auth-bearer-fields-a2a-edit",
+        "auth-headers-fields-a2a-edit",
+        "auth-oauth-fields-a2a-edit",
+    ];
+    sections.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.display = "none";
+        }
+    });
+    if (authType) {
+        const el = document.getElementById(`auth-${authType}-fields-a2a-edit`);
+        if (el) {
+            el.style.display = "block";
+        }
+    }
 }
 
 /**
@@ -9083,14 +9087,13 @@ async function handleA2AFormSubmit(e) {
         // ✅ Ensure visibility is captured from checked radio button
         // formData.set("visibility", visibility);
         formData.append("visibility", formData.get("visibility"));
-
         const teamId = new URL(window.location.href).searchParams.get(
             "team_id",
         );
         teamId && formData.append("team_id", teamId);
 
         // Submit to backend
-        //specifically log agentType only
+        // specifically log agentType only
         console.log("agentType:", formData.get("agentType"));
 
         const response = await fetch(`${window.ROOT_PATH}/admin/a2a`, {
@@ -9377,14 +9380,16 @@ async function handleEditA2AAgentFormSubmit(e) {
     const form = e.target;
     const formData = new FormData(form);
 
-    console.log("Edit A2A Agent Form Details: ")
-    console.log(JSON.stringify(Object.fromEntries(formData.entries()), null, 2));
+    console.log("Edit A2A Agent Form Details: ");
+    console.log(
+        JSON.stringify(Object.fromEntries(formData.entries()), null, 2),
+    );
 
     try {
         // Validate form inputs
         const name = formData.get("name");
         const url = formData.get("endpoint_url");
-        console.log("Original A2A URL: ",url)
+        console.log("Original A2A URL: ", url);
         const nameValidation = validateInputName(name, "a2a_agent");
         const urlValidation = validateUrl(url);
 
@@ -10269,10 +10274,10 @@ function setupFormHandlers() {
 
     // Checkpoint Started
     ["oauth-grant-type-gw-edit", "oauth-grant-type-a2a-edit"].forEach((id) => {
-    const field = safeGetElement(id);
-    if (field) {
-        field.addEventListener("change", handleEditOAuthGrantTypeChange);
-    }
+        const field = safeGetElement(id);
+        if (field) {
+            field.addEventListener("change", handleEditOAuthGrantTypeChange);
+        }
     });
     // Checkpoint Ended
 
@@ -10343,7 +10348,10 @@ function setupFormHandlers() {
 
     const editA2AAgentForm = safeGetElement("edit-a2a-agent-form");
     if (editA2AAgentForm) {
-        editA2AAgentForm.addEventListener("submit", handleEditA2AAgentFormSubmit);
+        editA2AAgentForm.addEventListener(
+            "submit",
+            handleEditA2AAgentFormSubmit,
+        );
         editA2AAgentForm.addEventListener("click", () => {
             if (getComputedStyle(editA2AAgentForm).display !== "none") {
                 refreshEditors();
@@ -10505,26 +10513,28 @@ function filterServerTable(searchText) {
 // Make server search function available globally
 window.filterServerTable = filterServerTable;
 
-function handleAuthTypeChange_xxx() {
+function handleAuthTypeChange() {
     const authType = this.value;
-    const basicFields = safeGetElement("auth-basic-fields-gw");
-    const bearerFields = safeGetElement("auth-bearer-fields-gw");
-    const headersFields = safeGetElement("auth-headers-fields-gw");
-    const oauthFields = safeGetElement("auth-oauth-fields-gw");
+
+    // Detect form type based on the element ID
+    // e.g., "auth-type-a2a" or "auth-type-gw"
+    const isA2A = this.id.includes("a2a");
+    const prefix = isA2A ? "a2a" : "gw";
+
+    // Select the correct field groups dynamically
+    const basicFields = safeGetElement(`auth-basic-fields-${prefix}`);
+    const bearerFields = safeGetElement(`auth-bearer-fields-${prefix}`);
+    const headersFields = safeGetElement(`auth-headers-fields-${prefix}`);
+    const oauthFields = safeGetElement(`auth-oauth-fields-${prefix}`);
 
     // Hide all auth sections first
-    if (basicFields) {
-        basicFields.style.display = "none";
-    }
-    if (bearerFields) {
-        bearerFields.style.display = "none";
-    }
-    if (headersFields) {
-        headersFields.style.display = "none";
-    }
-    if (oauthFields) {
-        oauthFields.style.display = "none";
-    }
+    [basicFields, bearerFields, headersFields, oauthFields].forEach(
+        (section) => {
+            if (section) {
+                section.style.display = "none";
+            }
+        },
+    );
 
     // Show the appropriate section
     switch (authType) {
@@ -10549,117 +10559,8 @@ function handleAuthTypeChange_xxx() {
             }
             break;
         default:
-            // No auth - keep everything hidden
-            break;
-    }
-}
-
-function handleAuthTypeChange() {
-    const authType = this.value;
-
-    // Detect form type based on the element ID
-    // e.g., "auth-type-a2a" or "auth-type-gw"
-    const isA2A = this.id.includes("a2a");
-    const prefix = isA2A ? "a2a" : "gw";
-
-    // Select the correct field groups dynamically
-    const basicFields = safeGetElement(`auth-basic-fields-${prefix}`);
-    const bearerFields = safeGetElement(`auth-bearer-fields-${prefix}`);
-    const headersFields = safeGetElement(`auth-headers-fields-${prefix}`);
-    const oauthFields = safeGetElement(`auth-oauth-fields-${prefix}`);
-
-    // Hide all auth sections first
-    [basicFields, bearerFields, headersFields, oauthFields].forEach(section => {
-        if (section) section.style.display = "none";
-    });
-
-    // Show the appropriate section
-    switch (authType) {
-        case "basic":
-            if (basicFields) basicFields.style.display = "block";
-            break;
-        case "bearer":
-            if (bearerFields) bearerFields.style.display = "block";
-            break;
-        case "authheaders":
-            if (headersFields) headersFields.style.display = "block";
-            break;
-        case "oauth":
-            if (oauthFields) oauthFields.style.display = "block";
-            break;
-        default:
             // "none" or unknown type — keep everything hidden
             break;
-    }
-}
-
-
-function handleOAuthGrantTypeChange_xxx() {
-    const grantType = this.value;
-    const authCodeFields = safeGetElement("oauth-auth-code-fields-gw");
-    const usernameField = safeGetElement("oauth-username-field-gw");
-    const passwordField = safeGetElement("oauth-password-field-gw");
-
-    if (authCodeFields) {
-        if (grantType === "authorization_code") {
-            authCodeFields.style.display = "block";
-
-            // Make authorization code specific fields required
-            const requiredFields =
-                authCodeFields.querySelectorAll('input[type="url"]');
-            requiredFields.forEach((field) => {
-                field.required = true;
-            });
-
-            // Show additional validation for required fields
-            console.log(
-                "Authorization Code flow selected - additional fields are now required",
-            );
-        } else {
-            authCodeFields.style.display = "none";
-
-            // Remove required validation for hidden fields
-            const requiredFields =
-                authCodeFields.querySelectorAll('input[type="url"]');
-            requiredFields.forEach((field) => {
-                field.required = false;
-            });
-        }
-    }
-
-    // Handle password grant type fields
-    if (usernameField && passwordField) {
-        if (grantType === "password") {
-            usernameField.style.display = "block";
-            passwordField.style.display = "block";
-
-            // Make username and password required for password grant
-            const usernameInput = safeGetElement("oauth-username-gw");
-            const passwordInput = safeGetElement("oauth-password-gw");
-            if (usernameInput) {
-                usernameInput.required = true;
-            }
-            if (passwordInput) {
-                passwordInput.required = true;
-            }
-
-            console.log(
-                "Password grant flow selected - username and password are now required",
-            );
-        } else {
-            usernameField.style.display = "none";
-            passwordField.style.display = "none";
-
-            // Remove required validation for hidden fields
-            const usernameInput = safeGetElement("oauth-username-gw");
-            const passwordInput = safeGetElement("oauth-password-gw");
-            if (usernameInput) {
-                usernameInput.required = false;
-            }
-            if (passwordInput) {
-                passwordInput.required = false;
-            }
-        }
     }
 }
 
@@ -10681,18 +10582,20 @@ function handleOAuthGrantTypeChange() {
             authCodeFields.style.display = "block";
 
             // Make URL fields required
-            const requiredFields = authCodeFields.querySelectorAll('input[type="url"]');
-            requiredFields.forEach((field) => field.required = true);
+            const requiredFields =
+                authCodeFields.querySelectorAll('input[type="url"]');
+            requiredFields.forEach((field) => (field.required = true));
 
             console.log(
-                `(${prefix.toUpperCase()}) Authorization Code flow selected - fields are now required`
+                `(${prefix.toUpperCase()}) Authorization Code flow selected - fields are now required`,
             );
         } else {
             authCodeFields.style.display = "none";
 
             // Remove required validation
-            const requiredFields = authCodeFields.querySelectorAll('input[type="url"]');
-            requiredFields.forEach((field) => field.required = false);
+            const requiredFields =
+                authCodeFields.querySelectorAll('input[type="url"]');
+            requiredFields.forEach((field) => (field.required = false));
         }
     }
 
@@ -10705,18 +10608,26 @@ function handleOAuthGrantTypeChange() {
             usernameField.style.display = "block";
             passwordField.style.display = "block";
 
-            if (usernameInput) usernameInput.required = true;
-            if (passwordInput) passwordInput.required = true;
+            if (usernameInput) {
+                usernameInput.required = true;
+            }
+            if (passwordInput) {
+                passwordInput.required = true;
+            }
 
             console.log(
-                `(${prefix.toUpperCase()}) Password grant flow selected - username and password are now required`
+                `(${prefix.toUpperCase()}) Password grant flow selected - username and password are now required`,
             );
         } else {
             usernameField.style.display = "none";
             passwordField.style.display = "none";
 
-            if (usernameInput) usernameInput.required = false;
-            if (passwordInput) passwordInput.required = false;
+            if (usernameInput) {
+                usernameInput.required = false;
+            }
+            if (passwordInput) {
+                passwordInput.required = false;
+            }
         }
     }
 }
@@ -10739,7 +10650,7 @@ function handleEditOAuthGrantTypeChange() {
             authCodeFields.style.display = "block";
             urlInputs.forEach((field) => (field.required = true));
             console.log(
-                `Authorization Code flow selected (${prefix}) - additional fields are now required`
+                `Authorization Code flow selected (${prefix}) - additional fields are now required`,
             );
         } else {
             authCodeFields.style.display = "none";
@@ -10756,65 +10667,6 @@ function handleEditOAuthGrantTypeChange() {
             usernameField.style.display = "block";
             passwordField.style.display = "block";
 
-            if (usernameInput) usernameInput.required = true;
-            if (passwordInput) passwordInput.required = true;
-
-            console.log(
-                `Password grant flow selected (${prefix}) - username and password are now required`
-            );
-        } else {
-            usernameField.style.display = "none";
-            passwordField.style.display = "none";
-
-            if (usernameInput) usernameInput.required = false;
-            if (passwordInput) passwordInput.required = false;
-        }
-    }
-}
-
-
-function handleEditOAuthGrantTypeChange_xxx() {
-    const grantType = this.value;
-    const authCodeFields = safeGetElement("oauth-auth-code-fields-gw-edit");
-    const usernameField = safeGetElement("oauth-username-field-gw-edit");
-    const passwordField = safeGetElement("oauth-password-field-gw-edit");
-
-    if (authCodeFields) {
-        if (grantType === "authorization_code") {
-            authCodeFields.style.display = "block";
-
-            // Make authorization code specific fields required
-            const requiredFields =
-                authCodeFields.querySelectorAll('input[type="url"]');
-            requiredFields.forEach((field) => {
-                field.required = true;
-            });
-
-            // Show additional validation for required fields
-            console.log(
-                "Authorization Code flow selected - additional fields are now required",
-            );
-        } else {
-            authCodeFields.style.display = "none";
-
-            // Remove required validation for hidden fields
-            const requiredFields =
-                authCodeFields.querySelectorAll('input[type="url"]');
-            requiredFields.forEach((field) => {
-                field.required = false;
-            });
-        }
-    }
-
-    // Handle password grant type fields
-    if (usernameField && passwordField) {
-        if (grantType === "password") {
-            usernameField.style.display = "block";
-            passwordField.style.display = "block";
-
-            // Make username and password required for password grant
-            const usernameInput = safeGetElement("oauth-username-gw-edit");
-            const passwordInput = safeGetElement("oauth-password-gw-edit");
             if (usernameInput) {
                 usernameInput.required = true;
             }
@@ -10823,15 +10675,12 @@ function handleEditOAuthGrantTypeChange_xxx() {
             }
 
             console.log(
-                "Password grant flow selected - username and password are now required",
+                `Password grant flow selected (${prefix}) - username and password are now required`,
             );
         } else {
             usernameField.style.display = "none";
             passwordField.style.display = "none";
 
-            // Remove required validation for hidden fields
-            const usernameInput = safeGetElement("oauth-username-gw-edit");
-            const passwordInput = safeGetElement("oauth-password-gw-edit");
             if (usernameInput) {
                 usernameInput.required = false;
             }
@@ -11453,7 +11302,6 @@ function filterEntitiesByTags(entityType, tagsInput) {
 
     let rows;
     if (entityType === "a2a-agents") {
-
         const panel = document.querySelector(`#${entityType}-panel`);
         rows = panel.querySelectorAll(".border.rounded-lg.p-4");
         // 👆 adjust selector if your agent cards have different class names
@@ -11474,6 +11322,8 @@ function filterEntitiesByTags(entityType, tagsInput) {
 
         // Extract tags from this row using specific tag selectors (not status badges)
         const rowTags = new Set();
+
+        /*
         const tagElements_ver1 = row.querySelectorAll(`
             span.inline-flex.items-center.px-2.py-0\\.5.rounded.text-xs.font-medium.bg-blue-100.text-blue-800,
             span.inline-block.bg-blue-100.text-blue-800.text-xs.px-2.py-1.rounded-full
@@ -11485,6 +11335,7 @@ function filterEntitiesByTags(entityType, tagsInput) {
             span.inline-flex.items-center.px-2.py-1.rounded.text-xs.bg-gray-100.text-gray-700,
             span.inline-block.bg-blue-100.text-blue-800.text-xs.px-2.py-1.rounded-full
         `);
+        */
 
         const tagElements = row.querySelectorAll(`
             /* Gateways */
@@ -11496,7 +11347,6 @@ function filterEntitiesByTags(entityType, tagsInput) {
             /* Gray tags for A2A agent metadata */
             span.inline-flex.items-center.px-2\\.5.py-0\\.5.rounded-full.text-xs.font-medium.bg-gray-100.text-gray-700
         `);
-
 
         tagElements.forEach((tagEl) => {
             const tagText = tagEl.textContent.trim().toLowerCase();

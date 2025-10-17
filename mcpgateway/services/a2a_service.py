@@ -13,13 +13,14 @@ and interactions with A2A-compatible agents.
 
 # Standard
 from datetime import datetime, timezone
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, TYPE_CHECKING
 
 # Third-Party
 import httpx
 from sqlalchemy import and_, case, delete, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 # First-Party
 from mcpgateway.db import A2AAgent as DbA2AAgent
@@ -174,8 +175,13 @@ class A2AAgentService:
 
         Raises:
             A2AAgentNameConflictError: If an agent with the same name already exists.
+<<<<<<< HEAD
             IntegrityError: If a database integrity error occurs.
             A2AAgentError: For other errors during registration.
+=======
+            IntegrityError: If a database constraint is violated during commit.
+            ValueError: If invalid data or configuration is provided.
+>>>>>>> 1ecd66b8 (lint web fixes)
         """
         try:
             agent_data.slug = slugify(agent_data.name)
@@ -259,6 +265,7 @@ class A2AAgentService:
 
             logger.info(f"Registered new A2A agent: {new_agent.name} (ID: {new_agent.id})")
             return self._db_to_schema(new_agent)
+<<<<<<< HEAD
         except A2AAgentNameConflictError as ie:
             db.rollback()
             raise ie
@@ -269,6 +276,24 @@ class A2AAgentService:
         except Exception as e:
             db.rollback()
             raise A2AAgentError(f"Failed to register A2A agent: {str(e)}")
+=======
+        except* A2AAgentNameConflictError as ance:
+            if TYPE_CHECKING:
+                ance: ExceptionGroup[A2AAgentNameConflictError]
+            logger.error(f"A2AAgentNameConflictError in group: {ance.exceptions}")
+            raise ance.exceptions[0]
+        except* IntegrityError as ie:  # pragma: no mutate
+            if TYPE_CHECKING:
+                ie: ExceptionGroup[IntegrityError]
+            logger.error(f"IntegrityErrors in group: {ie.exceptions}")
+            raise ie.exceptions[0]
+        except* ValueError as ve:  # pragma: no mutate
+            if TYPE_CHECKING:
+                ve: ExceptionGroup[ValueError]
+            logger.error(f"ValueErrors in group: {ve.exceptions}")
+            raise ve.exceptions[0]
+
+>>>>>>> 1ecd66b8 (lint web fixes)
 
     async def list_agents(self, db: Session, cursor: Optional[str] = None, include_inactive: bool = False, tags: Optional[List[str]] = None) -> List[A2AAgentRead]:  # pylint: disable=unused-argument
         """List A2A agents with optional filtering.
