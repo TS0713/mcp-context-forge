@@ -316,6 +316,7 @@ def rate_limit(requests_per_minute: Optional[int] = None):
             return await func_to_wrap(*args, request=request, **kwargs)
 
         return wrapper
+
     return decorator
 
 
@@ -6108,8 +6109,7 @@ async def admin_add_gateway(request: Request, db: Session = Depends(get_db), use
             LOGGER.info("✅ Auto-detected OAuth configuration, setting auth_type='oauth'")
         elif oauth_config and auth_type_from_form:
             LOGGER.info(f"✅ OAuth config present with explicit auth_type='{auth_type_from_form}'")
-        
-        
+
         gateway = GatewayCreate(
             name=str(form["name"]),
             url=str(form["url"]),

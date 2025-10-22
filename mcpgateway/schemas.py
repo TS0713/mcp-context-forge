@@ -4367,7 +4367,7 @@ class A2AAgentUpdate(BaseModelWithConfigDict):
         if v is not None:
             return SecurityValidator.validate_uuid(v, "team_id")
         return v
-    
+
     @field_validator("auth_value", mode="before")
     @classmethod
     def create_auth_value(cls, v, info):
