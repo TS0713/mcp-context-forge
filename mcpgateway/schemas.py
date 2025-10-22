@@ -4085,6 +4085,30 @@ class A2AAgentCreate(BaseModel):
             return SecurityValidator.validate_uuid(v, "team_id")
         return v
 
+    @field_validator("auth_value", mode="before")
+    @classmethod
+    def create_auth_value(cls, v, info):
+        """
+        This validator will run before the model is fully instantiated (mode="before")
+        It will process the auth fields based on auth_type and generate auth_value.
+
+        Args:
+            v: Input url
+            info: ValidationInfo containing auth_type
+
+        Returns:
+            str: Auth value
+        """
+        data = info.data
+        auth_type = data.get("auth_type")
+
+        if (auth_type is None) or (auth_type == ""):
+            return v  # If no auth_type is provided, no need to create auth_value
+
+        # Process the auth fields and generate auth_value based on auth_type
+        auth_value = cls._process_auth_fields(info)
+        return auth_value
+
     @staticmethod
     def _process_auth_fields(info: ValidationInfo) -> Optional[str]:
         """
@@ -4343,6 +4367,129 @@ class A2AAgentUpdate(BaseModelWithConfigDict):
         if v is not None:
             return SecurityValidator.validate_uuid(v, "team_id")
         return v
+    
+    @field_validator("auth_value", mode="before")
+    @classmethod
+    def create_auth_value(cls, v, info):
+        """
+        This validator will run before the model is fully instantiated (mode="before")
+        It will process the auth fields based on auth_type and generate auth_value.
+
+        Args:
+            v: Input URL
+            info: ValidationInfo containing auth_type
+
+        Returns:
+            str: Auth value or URL
+        """
+        data = info.data
+        auth_type = data.get("auth_type")
+
+        if (auth_type is None) or (auth_type == ""):
+            return v  # If no auth_type is provided, no need to create auth_value
+
+        # Process the auth fields and generate auth_value based on auth_type
+        auth_value = cls._process_auth_fields(info)
+        return auth_value
+
+    @staticmethod
+    def _process_auth_fields(info: ValidationInfo) -> Optional[str]:
+        """
+        Processes the input authentication fields and returns the correct auth_value.
+        This method is called based on the selected auth_type.
+
+        Args:
+            info: ValidationInfo containing auth fields
+
+        Returns:
+            Encoded auth string or None
+
+        Raises:
+            ValueError: If auth type is invalid
+        """
+
+        data = info.data
+        auth_type = data.get("auth_type")
+
+        if auth_type == "basic":
+            # For basic authentication, both username and password must be present
+            username = data.get("auth_username")
+            password = data.get("auth_password")
+            if not username or not password:
+                raise ValueError("For 'basic' auth, both 'auth_username' and 'auth_password' must be provided.")
+
+            creds = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode()
+            return encode_auth({"Authorization": f"Basic {creds}"})
+
+        if auth_type == "bearer":
+            # For bearer authentication, only token is required
+            token = data.get("auth_token")
+
+            if not token:
+                raise ValueError("For 'bearer' auth, 'auth_token' must be provided.")
+
+            return encode_auth({"Authorization": f"Bearer {token}"})
+
+        if auth_type == "oauth":
+            # For OAuth authentication, we don't encode anything here
+            # The OAuth configuration is handled separately in the oauth_config field
+            # This method is only called for traditional auth types
+            return None
+
+        if auth_type == "authheaders":
+            # Support both new multi-headers format and legacy single header format
+            auth_headers = data.get("auth_headers")
+            if auth_headers and isinstance(auth_headers, list):
+                # New multi-headers format with enhanced validation
+                header_dict = {}
+                duplicate_keys = set()
+
+                for header in auth_headers:
+                    if not isinstance(header, dict):
+                        continue
+
+                    key = header.get("key")
+                    value = header.get("value", "")
+
+                    # Skip headers without keys
+                    if not key:
+                        continue
+
+                    # Track duplicate keys (last value wins)
+                    if key in header_dict:
+                        duplicate_keys.add(key)
+
+                    # Validate header key format (basic HTTP header validation)
+                    if not all(c.isalnum() or c in "-_" for c in key.replace(" ", "")):
+                        raise ValueError(f"Invalid header key format: '{key}'. Header keys should contain only alphanumeric characters, hyphens, and underscores.")
+
+                    # Store header (empty values are allowed)
+                    header_dict[key] = value
+
+                # Ensure at least one valid header
+                if not header_dict:
+                    raise ValueError("For 'headers' auth, at least one valid header with a key must be provided.")
+
+                # Warn about duplicate keys (optional - could log this instead)
+                if duplicate_keys:
+                    logging.warning(f"Duplicate header keys detected (last value used): {', '.join(duplicate_keys)}")
+
+                # Check for excessive headers (prevent abuse)
+                if len(header_dict) > 100:
+                    raise ValueError("Maximum of 100 headers allowed per gateway.")
+
+                return encode_auth(header_dict)
+
+            # Legacy single header format (backward compatibility)
+            header_key = data.get("auth_header_key")
+            header_value = data.get("auth_header_value")
+
+            if not header_key or not header_value:
+                raise ValueError("For 'headers' auth, either 'auth_headers' list or both 'auth_header_key' and 'auth_header_value' must be provided.")
+
+            return encode_auth({header_key: header_value})
+
+        raise ValueError("Invalid 'auth_type'. Must be one of: basic, bearer, oauth, or headers.")
 
 
 class A2AAgentRead(BaseModelWithConfigDict):
@@ -4366,11 +4513,11 @@ class A2AAgentRead(BaseModelWithConfigDict):
     - Authentication header value: for headers auth
     """
 
-    id: str
-    name: str
-    slug: str
-    description: Optional[str]
-    endpoint_url: str
+    id: Optional[str] = Field(None, description="Unique ID of the a2a agent")
+    name: str = Field(..., description="Unique name for the a2a agent")
+    slug: Optional[str] = Field(None, description="Slug for a2a agent endpoint URL")
+    description: Optional[str] = Field(None, description="a2a agent description")
+    endpoint_url: str = Field(..., description="a2a agent endpoint URL")
     agent_type: str
     protocol_version: str
     capabilities: Dict[str, Any]
@@ -4414,8 +4561,146 @@ class A2AAgentRead(BaseModelWithConfigDict):
 
     # Team scoping fields
     team_id: Optional[str] = Field(None, description="ID of the team that owns this resource")
+    team: Optional[str] = Field(None, description="Name of the team that owns this resource")
     owner_email: Optional[str] = Field(None, description="Email of the user who owns this resource")
     visibility: Optional[str] = Field(default="public", description="Visibility level: private, team, or public")
+
+    # This will be the main method to automatically populate fields
+    @model_validator(mode="after")
+    def _populate_auth(self) -> Self:
+        """Populate authentication fields based on auth_type and encoded auth_value.
+
+        This post-validation method decodes the stored authentication value and
+        populates the appropriate authentication fields (username/password, token,
+        or custom headers) based on the authentication type. It ensures the
+        authentication data is properly formatted and accessible through individual
+        fields for display purposes.
+
+        The method handles three authentication types:
+        - basic: Extracts username and password from Authorization header
+        - bearer: Extracts token from Bearer Authorization header
+        - authheaders: Extracts custom header key/value pair
+
+        Returns:
+            Self: The instance with populated authentication fields:
+                - For basic: auth_username and auth_password
+                - For bearer: auth_token
+                - For authheaders: auth_header_key and auth_header_value
+
+        Raises:
+            ValueError: If the authentication data is malformed:
+                    - Basic auth missing username or password
+                    - Bearer auth missing or improperly formatted Authorization header
+                    - Custom headers not exactly one key/value pair
+
+        Examples:
+            >>> # Basic auth example
+            >>> string_bytes = "admin:secret".encode("utf-8")
+            >>> encoded_auth = base64.urlsafe_b64encode(string_bytes).decode("utf-8")
+            >>> values = GatewayRead.model_construct(
+            ...     auth_type="basic",
+            ...     auth_value=encode_auth({"Authorization": f"Basic {encoded_auth}"})
+            ... )
+            >>> values = A2AAgentRead._populate_auth(values)
+            >>> values.auth_username
+            'admin'
+            >>> values.auth_password
+            'secret'
+
+            >>> # Bearer auth example
+            >>> values = A2AAgentRead.model_construct(
+            ...     auth_type="bearer",
+            ...     auth_value=encode_auth({"Authorization": "Bearer mytoken123"})
+            ... )
+            >>> values = A2AAgentRead._populate_auth(values)
+            >>> values.auth_token
+            'mytoken123'
+
+            >>> # Custom headers example
+            >>> values = A2AAgentRead.model_construct(
+            ...     auth_type='authheaders',
+            ...     auth_value=encode_auth({"X-API-Key": "abc123"})
+            ... )
+            >>> values = A2AAgentRead._populate_auth(values)
+            >>> values.auth_header_key
+            'X-API-Key'
+            >>> values.auth_header_value
+            'abc123'
+        """
+        auth_type = self.auth_type
+        auth_value_encoded = self.auth_value
+        # Skip validation logic if masked value
+        if auth_value_encoded == settings.masked_auth_value:
+            return self
+
+        # Handle OAuth authentication (no auth_value to decode)
+        if auth_type == "oauth":
+            # OAuth gateways don't have traditional auth_value to decode
+            # They use oauth_config instead
+            return self
+
+        # If no encoded value is present, nothing to populate
+        if not auth_value_encoded:
+            return self
+
+        auth_value = decode_auth(auth_value_encoded)
+        if auth_type == "basic":
+            auth = auth_value.get("Authorization")
+            if not (isinstance(auth, str) and auth.startswith("Basic ")):
+                raise ValueError("basic auth requires an Authorization header of the form 'Basic <base64>'")
+            auth = auth.removeprefix("Basic ")
+            u, p = base64.urlsafe_b64decode(auth).decode("utf-8").split(":")
+            if not u or not p:
+                raise ValueError("basic auth requires both username and password")
+            self.auth_username, self.auth_password = u, p
+
+        elif auth_type == "bearer":
+            auth = auth_value.get("Authorization")
+            if not (isinstance(auth, str) and auth.startswith("Bearer ")):
+                raise ValueError("bearer auth requires an Authorization header of the form 'Bearer <token>'")
+            self.auth_token = auth.removeprefix("Bearer ")
+
+        elif auth_type == "authheaders":
+            # For backward compatibility, populate first header in key/value fields
+            if len(auth_value) == 0:
+                raise ValueError("authheaders requires at least one key/value pair")
+            k, v = next(iter(auth_value.items()))
+            self.auth_header_key, self.auth_header_value = k, v
+        return self
+
+    def masked(self) -> "A2AAgentRead":
+        """
+        Return a masked version of the model instance with sensitive authentication fields hidden.
+
+        This method creates a dictionary representation of the model data and replaces sensitive fields
+        such as `auth_value`, `auth_password`, `auth_token`, and `auth_header_value` with a masked
+        placeholder value defined in `settings.masked_auth_value`. Masking is only applied if the fields
+        are present and not already masked.
+
+        Args:
+            None
+
+        Returns:
+            A2AAgentRead: A new instance of the A2AAgentRead model with sensitive authentication-related fields
+            masked to prevent exposure of sensitive information.
+
+        Notes:
+            - The `auth_value` field is only masked if it exists and its value is different from the masking
+            placeholder.
+            - Other sensitive fields (`auth_password`, `auth_token`, `auth_header_value`) are masked if present.
+            - Fields not related to authentication remain unmodified.
+        """
+        masked_data = self.model_dump()
+
+        # Only mask if auth_value is present and not already masked
+        if masked_data.get("auth_value") and masked_data["auth_value"] != settings.masked_auth_value:
+            masked_data["auth_value"] = settings.masked_auth_value
+
+        masked_data["auth_password"] = settings.masked_auth_value if masked_data.get("auth_password") else None
+        masked_data["auth_token"] = settings.masked_auth_value if masked_data.get("auth_token") else None
+        masked_data["auth_header_value"] = settings.masked_auth_value if masked_data.get("auth_header_value") else None
+
+        return A2AAgentRead.model_validate(masked_data)
 
 
 class A2AAgentInvocation(BaseModelWithConfigDict):

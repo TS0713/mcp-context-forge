@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 # First-Party
 from mcpgateway.db import A2AAgent as DbA2AAgent
 from mcpgateway.db import A2AAgentMetric
+from mcpgateway.db import EmailTeam
 from mcpgateway.schemas import A2AAgentCreate, A2AAgentMetrics, A2AAgentRead, A2AAgentUpdate
 from mcpgateway.services.logging_service import LoggingService
 from mcpgateway.services.team_management_service import TeamManagementService
@@ -141,6 +142,22 @@ class A2AAgentService:
             logger.info("Shutting down A2A Agent Service")
             self._initialized = False
 
+    def _get_team_name(self, db: Session, team_id: Optional[str]) -> Optional[str]:
+        """Retrieve the team name given a team ID.
+
+        Args:
+            db (Session): Database session for querying teams.
+            team_id (Optional[str]): The ID of the team.
+
+        Returns:
+            Optional[str]: The name of the team if found, otherwise None.
+        """
+        if not team_id:
+            return None
+        
+        team = db.query(EmailTeam).filter(EmailTeam.id == team_id, EmailTeam.is_active.is_(True)).first()
+        return team.name if team else None
+    
     async def register_agent(
         self,
         db: Session,
@@ -181,7 +198,29 @@ class A2AAgentService:
 =======
             IntegrityError: If a database constraint is violated during commit.
             ValueError: If invalid data or configuration is provided.
->>>>>>> 1ecd66b8 (lint web fixes)
+            ExceptionGroup[A2AAgentNameConflictError]: If multiple agent name conflicts occur concurrently.
+            ExceptionGroup[IntegrityError]: If multiple database integrity errors occur concurrently.
+            ExceptionGroup[ValueError]: If multiple value errors occur concurrently.
+
+        Examples:
+            Example 1: Create a new public agent
+            >>> agent_data = A2AAgentCreate(
+            ...     name="WeatherBot",
+            ...     endpoint_url="https://api.weatheragent.com",
+            ...     agent_type="openai",
+            ...     protocol_version="1.0",
+            ...     capabilities={"forecast": True},
+            ... )
+            >>> result = await service.register_agent(db, agent_data, created_by="alice@example.com")
+            >>> print(result.name)
+            WeatherBot
+
+            Example 2: Handle duplicate agent name
+            >>> try:
+            ...     await service.register_agent(db, agent_data)
+            ... except A2AAgentNameConflictError:
+            ...     print("Agent with same name already exists")
+            Agent with same name already exists
         """
         try:
             agent_data.slug = slugify(agent_data.name)
@@ -211,18 +250,18 @@ class A2AAgentService:
                 header_dict = {h["key"]: h["value"] for h in agent_data.auth_headers if h.get("key")}
                 # Keep encoded form for persistence, but pass raw headers for initialization
                 auth_value = encode_auth(header_dict)  # Encode the dict for consistency
-
                 # authentication_headers = {str(k): str(v) for k, v in header_dict.items()}
             # elif isinstance(auth_value, str) and auth_value:
             #    # Decode persisted auth for initialization
             #    decoded = decode_auth(auth_value)
             # authentication_headers = {str(k): str(v) for k, v in decoded.items()}
             else:
-                #    #authentication_headers = None
-                auth_value = {}
+                #authentication_headers = None
+                pass
+                #auth_value = {}
 
             oauth_config = getattr(agent_data, "oauth_config", None)
-
+        
             # Create new agent
             new_agent = DbA2AAgent(
                 name=agent_data.name,
@@ -264,7 +303,7 @@ class A2AAgentService:
             )
 
             logger.info(f"Registered new A2A agent: {new_agent.name} (ID: {new_agent.id})")
-            return self._db_to_schema(new_agent)
+            return self._db_to_schema(db=db,db_agent=new_agent)
 <<<<<<< HEAD
         except A2AAgentNameConflictError as ie:
             db.rollback()
@@ -292,8 +331,6 @@ class A2AAgentService:
                 ve: ExceptionGroup[ValueError]
             logger.error(f"ValueErrors in group: {ve.exceptions}")
             raise ve.exceptions[0]
-
->>>>>>> 1ecd66b8 (lint web fixes)
 
     async def list_agents(self, db: Session, cursor: Optional[str] = None, include_inactive: bool = False, tags: Optional[List[str]] = None) -> List[A2AAgentRead]:  # pylint: disable=unused-argument
         """List A2A agents with optional filtering.
@@ -324,7 +361,8 @@ class A2AAgentService:
         query = query.order_by(desc(DbA2AAgent.created_at))
 
         agents = db.execute(query).scalars().all()
-        return [self._db_to_schema(agent) for agent in agents]
+
+        return [self._db_to_schema(db=db,db_agent=agent) for agent in agents]
 
     async def list_agents_for_user(
         self, db: Session, user_info: Dict[str, Any], team_id: Optional[str] = None, visibility: Optional[str] = None, include_inactive: bool = False, skip: int = 0, limit: int = 100
@@ -397,14 +435,15 @@ class A2AAgentService:
         query = query.offset(skip).limit(limit)
 
         agents = db.execute(query).scalars().all()
-        return [self._db_to_schema(agent) for agent in agents]
-
-    async def get_agent(self, db: Session, agent_id: str) -> A2AAgentRead:
+        return [self._db_to_schema(db=db,db_agent=agent) for agent in agents]
+    
+    async def get_agent(self, db: Session, agent_id: str, include_inactive: bool = True) -> A2AAgentRead:
         """Retrieve an A2A agent by ID.
 
         Args:
             db: Database session.
             agent_id: Agent ID.
+            include_inactive: Whether to include inactive a2a agents
 
         Returns:
             Agent data.
@@ -418,7 +457,19 @@ class A2AAgentService:
         if not agent:
             raise A2AAgentNotFoundError(f"A2A Agent not found with ID: {agent_id}")
 
-        return self._db_to_schema(agent)
+        #if agent.enabled or include_inactive:
+        #    agent.team = self._get_team_name(db, getattr(agent, "team_id", None))
+        #    return A2AAgentRead.model_validate(self._prepare_a2a_agent_for_read(agent)).masked()
+            
+        #raise A2AAgentNotFoundError(f"A2A Agent not found with ID: {agent_id}")
+    
+
+        if not agent.enabled and not include_inactive:
+            raise A2AAgentNotFoundError(f"A2A Agent not found with ID: {agent_id}")
+
+        # ✅ Delegate conversion and masking to _db_to_schema()
+        return self._db_to_schema(db=db,db_agent=agent)
+
 
     async def get_agent_by_name(self, db: Session, agent_name: str) -> A2AAgentRead:
         """Retrieve an A2A agent by name.
@@ -438,8 +489,8 @@ class A2AAgentService:
 
         if not agent:
             raise A2AAgentNotFoundError(f"A2A Agent not found with name: {agent_name}")
-
-        return self._db_to_schema(agent)
+        
+        return self._db_to_schema(db=db,db_agent=agent)
 
     async def update_agent(
         self,
@@ -526,7 +577,8 @@ class A2AAgentService:
             db.refresh(agent)
 
             logger.info(f"Updated A2A agent: {agent.name} (ID: {agent.id})")
-            return self._db_to_schema(agent)
+
+            return self._db_to_schema(db=db,db_agent=agent)
         except PermissionError:
             db.rollback()
             raise
@@ -584,7 +636,8 @@ class A2AAgentService:
 
         status = "activated" if activate else "deactivated"
         logger.info(f"A2A agent {status}: {agent.name} (ID: {agent.id})")
-        return self._db_to_schema(agent)
+
+        return self._db_to_schema(db=db,db_agent=agent)
 
     async def delete_agent(self, db: Session, agent_id: str, user_email: Optional[str] = None) -> None:
         """Delete an A2A agent.
@@ -771,7 +824,24 @@ class A2AAgentService:
 
         logger.info("Reset A2A agent metrics" + (f" for agent {agent_id}" if agent_id else ""))
 
-    def _db_to_schema(self, db_agent: DbA2AAgent) -> A2AAgentRead:
+    def _prepare_a2a_agent_for_read(self, agent: DbA2AAgent) -> DbA2AAgent:
+        """Prepare a a2a agent object for A2AAgentRead validation.
+
+        Ensures auth_value is in the correct format (encoded string) for the schema.
+
+        Args:
+            agent: A2A Agent database object
+
+        Returns:
+            A2A Agent object with properly formatted auth_value
+        """
+        # If auth_value is a dict, encode it to string for GatewayRead schema
+        if isinstance(agent.auth_value, dict):
+            agent.auth_value = encode_auth(agent.auth_value)
+        return agent
+
+
+    def _db_to_schema_xyz(self, db_agent: DbA2AAgent) -> A2AAgentRead:
         """Convert database model to schema.
 
         Args:
@@ -841,4 +911,93 @@ class A2AAgentService:
             visibility=db_agent.visibility,
             team_id=db_agent.team_id,
             owner_email=db_agent.owner_email,
+        )
+
+    def _db_to_schema(self, db: Session, db_agent: DbA2AAgent) -> A2AAgentRead:
+        """Convert database model to schema.
+
+        Args:
+            db_agent: Database agent model.
+
+        Returns:
+            Agent read schema.
+        """
+
+        if not db_agent:
+            raise GatewayNotFoundError("Agent not found")
+
+        # assign teams attribute to agent
+        setattr(db_agent, "team", self._get_team_name(db, getattr(db_agent, "team_id", None)))
+
+        # Prepare the agent (encode auth_value, enrich team, etc.)
+        #db_agent = self._prepare_a2a_agent_for_read(db_agent)
+
+        # ✅ Compute metrics
+        total_executions = len(db_agent.metrics)
+        successful_executions = sum(1 for m in db_agent.metrics if m.is_success)
+        failed_executions = total_executions - successful_executions
+        failure_rate = (failed_executions / total_executions * 100) if total_executions > 0 else 0.0
+
+        min_response_time = max_response_time = avg_response_time = last_execution_time = None
+        if db_agent.metrics:
+            response_times = [m.response_time for m in db_agent.metrics if m.response_time is not None]
+            if response_times:
+                min_response_time = min(response_times)
+                max_response_time = max(response_times)
+                avg_response_time = sum(response_times) / len(response_times)
+            last_execution_time = max((m.timestamp for m in db_agent.metrics), default=None)
+
+        metrics = A2AAgentMetrics(
+            total_executions=total_executions,
+            successful_executions=successful_executions,
+            failed_executions=failed_executions,
+            failure_rate=failure_rate,
+            min_response_time=min_response_time,
+            max_response_time=max_response_time,
+            avg_response_time=avg_response_time,
+            last_execution_time=last_execution_time,
+        )
+
+        return (
+            A2AAgentRead(
+                id=db_agent.id,
+                name=db_agent.name,
+                slug=db_agent.slug,
+                description=db_agent.description,
+                endpoint_url=db_agent.endpoint_url,
+                agent_type=db_agent.agent_type,
+                protocol_version=db_agent.protocol_version,
+                capabilities=db_agent.capabilities,
+                config=db_agent.config,
+                auth_type=db_agent.auth_type,
+                auth_username=None,
+                auth_password=None,
+                auth_token=None,
+                auth_header_key=None,
+                auth_header_value=None,
+                auth_value=db_agent.auth_value,#encoded_auth_value,
+                oauth_config=db_agent.oauth_config,
+                enabled=db_agent.enabled,
+                reachable=db_agent.reachable,
+                created_at=db_agent.created_at,
+                updated_at=db_agent.updated_at,
+                last_interaction=db_agent.last_interaction,
+                tags=db_agent.tags,
+                metrics=metrics,
+                created_by=db_agent.created_by,
+                created_from_ip=db_agent.created_from_ip,
+                created_via=db_agent.created_via,
+                created_user_agent=db_agent.created_user_agent,
+                modified_by=db_agent.modified_by,
+                modified_from_ip=db_agent.modified_from_ip,
+                modified_via=db_agent.modified_via,
+                modified_user_agent=db_agent.modified_user_agent,
+                import_batch_id=db_agent.import_batch_id,
+                federation_source=db_agent.federation_source,
+                version=db_agent.version,
+                visibility=db_agent.visibility,
+                team_id=db_agent.team_id,
+                team=getattr(db_agent, "team", None),
+                owner_email=db_agent.owner_email,
+            ).masked()
         )
