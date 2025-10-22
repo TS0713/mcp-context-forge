@@ -568,7 +568,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
             # Support multiple custom headers
             auth_value = getattr(gateway, "auth_value", {})
             authentication_headers: Optional[Dict[str, str]] = None
-            
+
             if hasattr(gateway, "auth_headers") and gateway.auth_headers:
                 # Convert list of {key, value} to dict
                 header_dict = {h["key"]: h["value"] for h in gateway.auth_headers if h.get("key")}
