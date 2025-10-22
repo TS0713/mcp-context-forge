@@ -2561,7 +2561,6 @@ class A2AAgent(Base):
     agent_type: Mapped[str] = mapped_column(String(50), nullable=False, default="generic")  # e.g., "openai", "anthropic", "custom"
     protocol_version: Mapped[str] = mapped_column(String(10), nullable=False, default="1.0")
     capabilities: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-
     # Configuration
     config: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
 

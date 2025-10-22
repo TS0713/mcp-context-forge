@@ -4135,6 +4135,8 @@ async function editGateway(gatewayId) {
 
         const gateway = await response.json();
 
+        console.log("Gateway Details: " + JSON.stringify(gateway, null, 2));
+
         const isInactiveCheckedBool = isInactiveChecked("gateways");
         let hiddenField = safeGetElement("edit-gateway-show-inactive");
         if (!hiddenField) {

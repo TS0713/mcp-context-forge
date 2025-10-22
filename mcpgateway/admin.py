@@ -312,90 +312,63 @@ def rate_limit(requests_per_minute: Optional[int] = None):
                     status_code=429,
                     detail=f"Rate limit exceeded. Maximum {limit} requests per minute.",
                 )
-
             rate_limit_storage[client_ip].append(current_time)
-
             # IMPORTANT: forward request to the real endpoint
             return await func_to_wrap(*args, request=request, **kwargs)
 
         return wrapper
-
     return decorator
 
-def get_user_email(user) -> str:
-    """Extract user email from JWT payload consistently.
+
+def get_user_email(user: Union[str, dict, object] = None) -> str:
+    """Return the user email from a JWT payload, user object, or string.
 
     Args:
-        user: User object from JWT token (from get_current_user_with_permissions)
+        user (Union[str, dict, object], optional): User object from JWT token
+            (from get_current_user_with_permissions). Can be:
+            - dict: representing JWT payload
+            - object: with an `email` attribute
+            - str: an email string
+            - None: will return "unknown"
+            Defaults to None.
 
     Returns:
-        str: User email address
+        str: User email address, or "unknown" if no email can be determined.
+             - If `user` is a dict, returns `sub` if present, else `email`, else "unknown".
+             - If `user` has an `email` attribute, returns that.
+             - If `user` is a string, returns it.
+             - If `user` is None, returns "unknown".
+             - Otherwise, returns str(user).
 
     Examples:
-        Test with dictionary user (JWT payload) with 'sub':
-        >>> from mcpgateway import admin
-        >>> user_dict = {'sub': 'alice@example.com', 'iat': 1234567890}
-        >>> admin.get_user_email(user_dict)
+        >>> get_user_email({'sub': 'alice@example.com'})
         'alice@example.com'
-
-        Test with dictionary user with 'email' field:
-        >>> user_dict = {'email': 'bob@company.com', 'role': 'admin'}
-        >>> admin.get_user_email(user_dict)
+        >>> get_user_email({'email': 'bob@company.com'})
         'bob@company.com'
-
-        Test with dictionary user with both 'sub' and 'email' (sub takes precedence):
-        >>> user_dict = {'sub': 'charlie@primary.com', 'email': 'charlie@secondary.com'}
-        >>> admin.get_user_email(user_dict)
+        >>> get_user_email({'sub': 'charlie@primary.com', 'email': 'charlie@secondary.com'})
         'charlie@primary.com'
-
-        Test with dictionary user with no email fields:
-        >>> user_dict = {'username': 'dave', 'role': 'user'}
-        >>> admin.get_user_email(user_dict)
+        >>> get_user_email({'username': 'dave'})
         'unknown'
-
-        Test with user object having email attribute:
         >>> class MockUser:
         ...     def __init__(self, email):
         ...         self.email = email
-        >>> user_obj = MockUser('eve@test.com')
-        >>> admin.get_user_email(user_obj)
+        >>> get_user_email(MockUser('eve@test.com'))
         'eve@test.com'
-
-        Test with user object without email attribute:
-        >>> class BasicUser:
-        ...     def __init__(self, name):
-        ...         self.name = name
-        ...     def __str__(self):
-        ...         return self.name
-        >>> user_obj = BasicUser('frank')
-        >>> admin.get_user_email(user_obj)
-        'frank'
-
-        Test with None user:
-        >>> admin.get_user_email(None)
+        >>> get_user_email(None)
         'unknown'
-
-        Test with string user:
-        >>> admin.get_user_email('grace@example.org')
+        >>> get_user_email('grace@example.org')
         'grace@example.org'
-
-        Test with empty dictionary:
-        >>> admin.get_user_email({})
+        >>> get_user_email({})
         'unknown'
-
-        Test with non-string, non-dict, non-object values:
-        >>> admin.get_user_email(12345)
+        >>> get_user_email(12345)
         '12345'
     """
     if isinstance(user, dict):
-        # Standard JWT format - try 'sub' first, then 'email'
         return user.get("sub") or user.get("email") or "unknown"
 
     if hasattr(user, "email"):
-        # User object with email attribute
         return user.email
 
-    # Fallback to string representation, but None becomes "unknown"
     if user is None:
         return "unknown"
 
@@ -6298,7 +6271,8 @@ async def admin_add_gateway(request: Request, db: Session = Depends(get_db), use
             LOGGER.info("✅ Auto-detected OAuth configuration, setting auth_type='oauth'")
         elif oauth_config and auth_type_from_form:
             LOGGER.info(f"✅ OAuth config present with explicit auth_type='{auth_type_from_form}'")
-
+        
+        
         gateway = GatewayCreate(
             name=str(form["name"]),
             url=str(form["url"]),
