@@ -405,7 +405,16 @@ class TestA2AAgentService:
         mock_db.commit.assert_called_once()
 
     def test_db_to_schema_conversion(self, service, sample_db_agent):
-        """Test database model to schema conversion."""
+        """Test database model to schema conversion with db parameter."""
+        from unittest.mock import MagicMock
+        from datetime import datetime, timezone
+
+        # Create a mock DB session
+        mock_db = MagicMock()
+
+        # Mock _get_team_name to return a test team name
+        service._get_team_name = MagicMock(return_value="Test Team")
+
         # Add some mock metrics
         metric1 = MagicMock()
         metric1.is_success = True
@@ -433,8 +442,8 @@ class TestA2AAgentService:
         sample_db_agent.version = 1
         sample_db_agent.visibility = "private"
 
-        # Execute
-        result = service._db_to_schema(sample_db_agent)
+        # Execute with db parameter
+        result = service._db_to_schema(mock_db, sample_db_agent)
 
         # Verify
         assert result.id == sample_db_agent.id
@@ -444,6 +453,7 @@ class TestA2AAgentService:
         assert result.metrics.failed_executions == 1
         assert result.metrics.failure_rate == 50.0
         assert result.metrics.avg_response_time == 1.5
+        assert result.team == "Test Team"  # Check that the mocked team name is set
 
 
 class TestA2AAgentIntegration:
