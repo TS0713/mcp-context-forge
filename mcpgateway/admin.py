@@ -5512,7 +5512,6 @@ async def admin_edit_tool(
             an error message if the update fails.
 
     Examples:
-            Examples:
         >>> import asyncio
         >>> from unittest.mock import AsyncMock, MagicMock
         >>> from fastapi import Request
@@ -5647,7 +5646,6 @@ async def admin_edit_tool(
 
         >>> # Restore original method
         >>> tool_service.update_tool = original_update_tool
-
     """
     LOGGER.debug(f"User {get_user_email(user)} is editing tool ID {tool_id}")
     form = await request.form()
@@ -6412,10 +6410,7 @@ async def admin_edit_gateway(
         >>>
         >>> async def test_admin_edit_gateway_success():
         ...     response = await admin_edit_gateway(gateway_id, mock_request_success, mock_db, mock_user)
-        ...     #print("Response:", response)
-        ...     #print("Status code:", response.status_code)
-        ...     #print("Body:", response.body)
-        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and json.loads(response.body)["success"]
+        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and json.loads(response.body)["success"] is True
         >>>
         >>> asyncio.run(test_admin_edit_gateway_success())
         True
@@ -7577,6 +7572,7 @@ async def admin_edit_prompt(
         >>> asyncio.run(test_admin_edit_prompt_inactive())
         True
         >>> prompt_service.update_prompt = original_update_prompt
+
     """
     LOGGER.debug(f"User {get_user_email(user)} is editing prompt {prompt_id}")
     form = await request.form()
@@ -9417,7 +9413,7 @@ async def admin_list_a2a_agents(
 
     Examples:
         >>> import asyncio
-        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from unittest.mock import AsyncMock, MagicMock, patch
         >>> from mcpgateway.schemas import A2AAgentRead, A2AAgentMetrics
         >>> from datetime import datetime, timezone
         >>>
@@ -9453,28 +9449,28 @@ async def admin_list_a2a_agents(
         ...     )
         ... )
         >>>
-        >>> original_list_agents_for_user = a2a_service.list_agents_for_user
-        >>> a2a_service.list_agents_for_user = AsyncMock(return_value=[mock_agent])
-        >>>
         >>> async def test_admin_list_a2a_agents_active():
-        ...     result = await admin_list_a2a_agents(include_inactive=False, db=mock_db, user=mock_user)
-        ...     return len(result) > 0 and isinstance(result[0], dict) and result[0]['name'] == "Agent1"
+        ...     fake_service = MagicMock()
+        ...     fake_service.list_agents_for_user = AsyncMock(return_value=[mock_agent])
+        ...     with patch("mcpgateway.admin.a2a_service", new=fake_service):
+        ...         result = await admin_list_a2a_agents(include_inactive=False, db=mock_db, user=mock_user)
+        ...         return len(result) > 0 and isinstance(result[0], dict) and result[0]['name'] == "Agent1"
         >>>
         >>> asyncio.run(test_admin_list_a2a_agents_active())
         True
         >>>
-        >>> a2a_service.list_agents_for_user = AsyncMock(side_effect=Exception("A2A error"))
         >>> async def test_admin_list_a2a_agents_exception():
-        ...     try:
-        ...         await admin_list_a2a_agents(False, db=mock_db, user=mock_user)
-        ...         return False
-        ...     except Exception as e:
-        ...         return "A2A error" in str(e)
+        ...     fake_service = MagicMock()
+        ...     fake_service.list_agents_for_user = AsyncMock(side_effect=Exception("A2A error"))
+        ...     with patch("mcpgateway.admin.a2a_service", new=fake_service):
+        ...         try:
+        ...             await admin_list_a2a_agents(False, db=mock_db, user=mock_user)
+        ...             return False
+        ...         except Exception as e:
+        ...             return "A2A error" in str(e)
         >>>
         >>> asyncio.run(test_admin_list_a2a_agents_exception())
         True
-        >>>
-        >>> a2a_service.list_agents_for_user = original_list_agents_for_user
     """
     if a2a_service is None:
         LOGGER.warning("A2A features are disabled, returning empty list")
@@ -9728,48 +9724,81 @@ async def admin_edit_a2a_agent(
     Returns:
         JSONResponse: A JSON response indicating success or failure.
 
-    Example:
-    >>> import asyncio, json
-    >>> from unittest.mock import AsyncMock, MagicMock
-    >>> from fastapi import Request
-    >>> from fastapi.responses import JSONResponse
-    >>> from starlette.datastructures import FormData
-    >>> import types, mcpgateway.admin as admin_mod
-    >>> mock_db = MagicMock()
-    >>> mock_user = {"email": "test@example.com"}
-    >>> agent_id = "agent-123"
-    >>> form_data_success = FormData([
-    ...     ("name", "Updated Agent"),
-    ...     ("endpoint_url", "http://example.com/agent"),
-    ...     ("agent_type", "generic"),
-    ...     ("auth_type", "basic"),
-    ...     ("auth_username", "user"),
-    ...     ("auth_password", "pass"),
-    ... ])
-    >>> mock_request_success = MagicMock(spec=Request, scope={"root_path": ""})
-    >>> mock_request_success.form = AsyncMock(return_value=form_data_success)
-    >>> admin_mod.get_user_email = lambda u: u["email"]
-    >>> admin_mod.get_oauth_encryption = lambda secret: types.SimpleNamespace(encrypt_secret=lambda s: f"enc({s})")
-    >>> admin_mod.settings = types.SimpleNamespace(auth_encryption_secret="dummy-secret")
-    >>> admin_mod.LOGGER = MagicMock()
-    >>> admin_mod.TeamManagementService = lambda db: types.SimpleNamespace(
-    ...     verify_team_for_user=AsyncMock(return_value="11111111-1111-1111-1111-111111111111")
-    ... )
-    >>> admin_mod.MetadataCapture = types.SimpleNamespace(extract_modification_metadata=lambda req, u, _: {
-    ...     "modified_by": "test@example.com",
-    ...     "modified_from_ip": "127.0.0.1",
-    ...     "modified_via": "UI",
-    ...     "modified_user_agent": "pytest"
-    ... })
-    >>> admin_mod.a2a_service = types.SimpleNamespace(update_agent=AsyncMock(return_value=True))
-    >>>
-    >>> async def test_admin_edit_a2a_agent_success():
-    ...     response = await admin_mod.admin_edit_a2a_agent(agent_id, mock_request_success, mock_db, mock_user)
-    ...     body = json.loads(response.body)
-    ...     return isinstance(response, JSONResponse) and response.status_code == 200 and body["success"] is True
-    >>>
-    >>> asyncio.run(test_admin_edit_a2a_agent_success())
-    True
+    Examples:
+        >>> import asyncio, json
+        >>> from unittest.mock import AsyncMock, MagicMock, patch
+        >>> from fastapi import Request
+        >>> from fastapi.responses import JSONResponse
+        >>> from starlette.datastructures import FormData
+        >>>
+        >>> mock_db = MagicMock()
+        >>> mock_user = {"email": "test_admin_user", "db": mock_db}
+        >>> agent_id = "agent-123"
+        >>>
+        >>> # Happy path: edit A2A agent successfully
+        >>> form_data_success = FormData([
+        ...     ("name", "Updated Agent"),
+        ...     ("endpoint_url", "http://updated-agent.com"),
+        ...     ("agent_type", "generic"),
+        ...     ("auth_type", "basic"),
+        ...     ("auth_username", "user"),
+        ...     ("auth_password", "pass"),
+        ... ])
+        >>> mock_request_success = MagicMock(spec=Request, scope={"root_path": ""})
+        >>> mock_request_success.form = AsyncMock(return_value=form_data_success)
+        >>> original_update_agent = a2a_service.update_agent
+        >>> a2a_service.update_agent = AsyncMock()
+        >>>
+        >>> async def test_admin_edit_a2a_agent_success():
+        ...     response = await admin_edit_a2a_agent(agent_id, mock_request_success, mock_db, mock_user)
+        ...     body = json.loads(response.body)
+        ...     return isinstance(response, JSONResponse) and response.status_code == 200 and body["success"] is True
+        >>>
+        >>> asyncio.run(test_admin_edit_a2a_agent_success())
+        True
+        >>>
+        >>> # Error path: simulate exception during update
+        >>> form_data_error = FormData([
+        ...     ("name", "Error Agent"),
+        ...     ("endpoint_url", "http://error-agent.com"),
+        ...     ("auth_type", "basic"),
+        ...     ("auth_username", "user"),
+        ...     ("auth_password", "pass"),
+        ... ])
+        >>> mock_request_error = MagicMock(spec=Request, scope={"root_path": ""})
+        >>> mock_request_error.form = AsyncMock(return_value=form_data_error)
+        >>> a2a_service.update_agent = AsyncMock(side_effect=Exception("Update failed"))
+        >>>
+        >>> async def test_admin_edit_a2a_agent_exception():
+        ...     response = await admin_edit_a2a_agent(agent_id, mock_request_error, mock_db, mock_user)
+        ...     body = json.loads(response.body)
+        ...     return isinstance(response, JSONResponse) and response.status_code == 500 and body["success"] is False and "Update failed" in body["message"]
+        >>>
+        >>> asyncio.run(test_admin_edit_a2a_agent_exception())
+        True
+        >>>
+        >>> # Validation error path: e.g., invalid URL
+        >>> form_data_validation = FormData([
+        ...     ("name", "Bad URL Agent"),
+        ...     ("endpoint_url", "invalid-url"),
+        ...     ("auth_type", "basic"),
+        ...     ("auth_username", "user"),
+        ...     ("auth_password", "pass"),
+        ... ])
+        >>> mock_request_validation = MagicMock(spec=Request, scope={"root_path": ""})
+        >>> mock_request_validation.form = AsyncMock(return_value=form_data_validation)
+        >>>
+        >>> async def test_admin_edit_a2a_agent_validation():
+        ...     response = await admin_edit_a2a_agent(agent_id, mock_request_validation, mock_db, mock_user)
+        ...     body = json.loads(response.body)
+        ...     return isinstance(response, JSONResponse) and response.status_code in (422, 400) and body["success"] is False
+        >>>
+        >>> asyncio.run(test_admin_edit_a2a_agent_validation())
+        True
+        >>>
+        >>> # Restore original method
+        >>> a2a_service.update_agent = original_update_agent
+
     """
 
     try:
