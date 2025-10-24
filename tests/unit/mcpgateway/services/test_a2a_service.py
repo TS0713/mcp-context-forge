@@ -21,7 +21,6 @@ from mcpgateway.db import A2AAgent as DbA2AAgent
 from mcpgateway.schemas import A2AAgentCreate, A2AAgentUpdate
 from mcpgateway.services.a2a_service import A2AAgentError, A2AAgentNameConflictError, A2AAgentNotFoundError, A2AAgentService
 
-
 class TestA2AAgentService:
     """Test suite for A2A Agent Service."""
 
@@ -43,11 +42,13 @@ class TestA2AAgentService:
             description="Test agent for unit tests",
             endpoint_url="https://api.example.com/agent",
             agent_type="custom",
+            auth_username="user",
+            auth_password="dummy_pass",
             protocol_version="1.0",
             capabilities={"chat": True, "tools": False},
             config={"max_tokens": 1000},
-            auth_type="api_key",
-            auth_value="test-api-key",
+            auth_type="basic",
+            auth_value="encode-auth-value",
             tags=["test", "ai"],
         )
 
@@ -65,8 +66,8 @@ class TestA2AAgentService:
             protocol_version="1.0",
             capabilities={"chat": True, "tools": False},
             config={"max_tokens": 1000},
-            auth_type="api_key",
-            auth_value="test-api-key",
+            auth_type="basic",
+            auth_value="encoded-auth-value",
             enabled=True,
             reachable=True,
             tags=["test", "ai"],
@@ -405,14 +406,11 @@ class TestA2AAgentService:
         mock_db.commit.assert_called_once()
 
     def test_db_to_schema_conversion(self, service, sample_db_agent):
-        """Test database model to schema conversion with db parameter."""
-        from unittest.mock import MagicMock
-        from datetime import datetime, timezone
+        """
+            Test database model to schema conversion with db parameter.
+        """
 
-        # Create a mock DB session
         mock_db = MagicMock()
-
-        # Mock _get_team_name to return a test team name
         service._get_team_name = MagicMock(return_value="Test Team")
 
         # Add some mock metrics
@@ -428,7 +426,10 @@ class TestA2AAgentService:
 
         sample_db_agent.metrics = [metric1, metric2]
 
-        # Set all required attributes that might be missing
+        # Add dummy auth_value (doesn't matter since we'll patch decode_auth)
+        sample_db_agent.auth_value = "fake_encrypted_auth"
+
+        # Set all required attributes
         sample_db_agent.created_by = "test_user"
         sample_db_agent.created_from_ip = "127.0.0.1"
         sample_db_agent.created_via = "test"
@@ -441,9 +442,13 @@ class TestA2AAgentService:
         sample_db_agent.federation_source = None
         sample_db_agent.version = 1
         sample_db_agent.visibility = "private"
+        sample_db_agent.auth_type = "none"
+        sample_db_agent.auth_header_key = "Authorization"
+        sample_db_agent.auth_header_value = "Basic dGVzdDp2YWx1ZQ=="  # base64 for "test:value"
 
-        # Execute with db parameter
-        result = service._db_to_schema(mock_db, sample_db_agent)
+        # Patch decode_auth to return a dummy decoded dict
+        with patch("mcpgateway.schemas.decode_auth", return_value={"user": "decoded"}):
+            result = service._db_to_schema(mock_db, sample_db_agent)
 
         # Verify
         assert result.id == sample_db_agent.id
@@ -453,7 +458,7 @@ class TestA2AAgentService:
         assert result.metrics.failed_executions == 1
         assert result.metrics.failure_rate == 50.0
         assert result.metrics.avg_response_time == 1.5
-        assert result.team == "Test Team"  # Check that the mocked team name is set
+        assert result.team == "Test Team"
 
 
 class TestA2AAgentIntegration:
