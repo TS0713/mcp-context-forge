@@ -602,19 +602,20 @@ class A2AAgentService:
                     raise PermissionError("Only the owner can update this agent")
             # Check for name conflict if name is being updated
             if agent_data.name and agent_data.name != agent.name:
+                new_slug = slugify(agent_data.name)
                 visibility = agent_data.visibility or agent.visibility
                 team_id = agent_data.team_id or agent.team_id
                 # Check for existing server with the same slug within the same team or public scope
                 if visibility.lower() == "public":
                     # Check for existing public a2a agent with the same slug
-                    existing_agent = db.execute(select(DbA2AAgent).where(DbA2AAgent.slug == agent_data.slug, DbA2AAgent.visibility == "public")).scalar_one_or_none()
+                    existing_agent = db.execute(select(DbA2AAgent).where(DbA2AAgent.slug == new_slug, DbA2AAgent.visibility == "public")).scalar_one_or_none()
                     if existing_agent:
-                        raise A2AAgentNameConflictError(name=agent_data.slug, is_active=existing_agent.enabled, agent_id=existing_agent.id, visibility=existing_agent.visibility)
+                        raise A2AAgentNameConflictError(name=new_slug, is_active=existing_agent.enabled, agent_id=existing_agent.id, visibility=existing_agent.visibility)
                 elif visibility.lower() == "team" and team_id:
                     # Check for existing team a2a agent with the same slug
-                    existing_agent = db.execute(select(DbA2AAgent).where(DbA2AAgent.slug == agent_data.slug, DbA2AAgent.visibility == "team", DbA2AAgent.team_id == team_id)).scalar_one_or_none()
+                    existing_agent = db.execute(select(DbA2AAgent).where(DbA2AAgent.slug == new_slug, DbA2AAgent.visibility == "team", DbA2AAgent.team_id == team_id)).scalar_one_or_none()
                     if existing_agent:
-                        raise A2AAgentNameConflictError(name=agent_data.slug, is_active=existing_agent.enabled, agent_id=existing_agent.id, visibility=existing_agent.visibility)
+                        raise A2AAgentNameConflictError(name=new_slug, is_active=existing_agent.enabled, agent_id=existing_agent.id, visibility=existing_agent.visibility)
             # Update fields
             update_data = agent_data.model_dump(exclude_unset=True)
             for field, value in update_data.items():
@@ -637,7 +638,6 @@ class A2AAgentService:
             db.refresh(agent)
 
             logger.info(f"Updated A2A agent: {agent.name} (ID: {agent.id})")
-
             return self._db_to_schema(db=db, db_agent=agent)
         except PermissionError:
             db.rollback()
