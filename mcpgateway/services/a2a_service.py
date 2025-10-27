@@ -304,6 +304,41 @@ class A2AAgentService:
 
         Returns:
             List of agent data.
+
+        Examples:
+            >>> from mcpgateway.services.a2a_service import A2AAgentService
+            >>> from unittest.mock import MagicMock
+            >>> from mcpgateway.schemas import A2AAgentRead
+            >>> import asyncio
+
+            >>> service = A2AAgentService()
+            >>> db = MagicMock()
+
+            >>> # Mock a single agent object returned by the DB
+            >>> agent_obj = MagicMock()
+            >>> db.execute.return_value.scalars.return_value.all.return_value = [agent_obj]
+
+            >>> # Mock the A2AAgentRead schema to return a masked string
+            >>> mocked_agent_read = MagicMock()
+            >>> mocked_agent_read.masked.return_value = 'agent_read'
+            >>> A2AAgentRead.model_validate = MagicMock(return_value=mocked_agent_read)
+
+            >>> # Run the service method
+            >>> result = asyncio.run(service.list_agents(db))
+            >>> result == ['agent_read']
+            True
+
+            >>> # Test include_inactive parameter (same mock works)
+            >>> result_with_inactive = asyncio.run(service.list_agents(db, include_inactive=True))
+            >>> result_with_inactive == ['agent_read']
+            True
+
+            >>> # Test empty result
+            >>> db.execute.return_value.scalars.return_value.all.return_value = []
+            >>> empty_result = asyncio.run(service.list_agents(db))
+            >>> empty_result
+            []
+
         """
         query = select(DbA2AAgent)
 
@@ -411,6 +446,72 @@ class A2AAgentService:
 
         Raises:
             A2AAgentNotFoundError: If the agent is not found.
+
+        Examples:
+            >>> from unittest.mock import MagicMock
+            >>> from datetime import datetime
+            >>> import asyncio
+            >>> from mcpgateway.schemas import A2AAgentRead
+            >>> from mcpgateway.services.a2a_service import A2AAgentService, A2AAgentNotFoundError
+
+            >>> service = A2AAgentService()
+            >>> db = MagicMock()
+
+            >>> # Create a mock agent
+            >>> agent_mock = MagicMock()
+            >>> agent_mock.enabled = True
+            >>> agent_mock.id = "agent_id"
+            >>> agent_mock.name = "Test Agent"
+            >>> agent_mock.slug = "test-agent"
+            >>> agent_mock.description = "A2A test agent"
+            >>> agent_mock.endpoint_url = "https://example.com"
+            >>> agent_mock.agent_type = "rest"
+            >>> agent_mock.protocol_version = "v1"
+            >>> agent_mock.capabilities = {}
+            >>> agent_mock.config = {}
+            >>> agent_mock.reachable = True
+            >>> agent_mock.created_at = datetime.now()
+            >>> agent_mock.updated_at = datetime.now()
+            >>> agent_mock.last_interaction = None
+            >>> agent_mock.tags = []
+            >>> agent_mock.metrics = MagicMock()
+            >>> agent_mock.metrics.success_rate = 1.0
+            >>> agent_mock.metrics.failure_rate = 0.0
+            >>> agent_mock.metrics.last_error = None
+            >>> agent_mock.auth_type = None
+            >>> agent_mock.auth_value = None
+            >>> agent_mock.oauth_config = None
+            >>> agent_mock.created_by = "user"
+            >>> agent_mock.created_from_ip = "127.0.0.1"
+            >>> agent_mock.created_via = "ui"
+            >>> agent_mock.created_user_agent = "test-agent"
+            >>> agent_mock.modified_by = "user"
+            >>> agent_mock.modified_from_ip = "127.0.0.1"
+            >>> agent_mock.modified_via = "ui"
+            >>> agent_mock.modified_user_agent = "test-agent"
+            >>> agent_mock.import_batch_id = None
+            >>> agent_mock.federation_source = None
+            >>> agent_mock.team_id = "team-1"
+            >>> agent_mock.team = "Team 1"
+            >>> agent_mock.owner_email = "owner@example.com"
+            >>> agent_mock.visibility = "public"
+
+            >>> db.get.return_value = agent_mock
+
+            >>> # Mock _db_to_schema to simplify test
+            >>> service._db_to_schema = lambda db, db_agent: 'agent_read'
+
+            >>> # Test with active agent
+            >>> result = asyncio.run(service.get_agent(db, 'agent_id'))
+            >>> result
+            'agent_read'
+
+            >>> # Test with inactive agent but include_inactive=True
+            >>> agent_mock.enabled = False
+            >>> result_inactive = asyncio.run(service.get_agent(db, 'agent_id', include_inactive=True))
+            >>> result_inactive
+            'agent_read'
+
         """
         query = select(DbA2AAgent).where(DbA2AAgent.id == agent_id)
         agent = db.execute(query).scalar_one_or_none()
@@ -817,11 +918,7 @@ class A2AAgentService:
         if not db_agent:
             raise A2AAgentNotFoundError("Agent not found")
 
-        # assign teams attribute to agent
         setattr(db_agent, "team", self._get_team_name(db, getattr(db_agent, "team_id", None)))
-
-        # Prepare the agent (encode auth_value, enrich team, etc.)
-        # db_agent = self._prepare_a2a_agent_for_read(db_agent)
 
         # ✅ Compute metrics
         total_executions = len(db_agent.metrics)
@@ -849,44 +946,13 @@ class A2AAgentService:
             last_execution_time=last_execution_time,
         )
 
-        return A2AAgentRead(
-            id=db_agent.id,
-            name=db_agent.name,
-            slug=db_agent.slug,
-            description=db_agent.description,
-            endpoint_url=db_agent.endpoint_url,
-            agent_type=db_agent.agent_type,
-            protocol_version=db_agent.protocol_version,
-            capabilities=db_agent.capabilities,
-            config=db_agent.config,
-            auth_type=db_agent.auth_type,
-            auth_username=None,
-            auth_password=None,
-            auth_token=None,
-            auth_header_key=None,
-            auth_header_value=None,
-            auth_value=db_agent.auth_value,  # encoded_auth_value,
-            oauth_config=db_agent.oauth_config,
-            enabled=db_agent.enabled,
-            reachable=db_agent.reachable,
-            created_at=db_agent.created_at,
-            updated_at=db_agent.updated_at,
-            last_interaction=db_agent.last_interaction,
-            tags=db_agent.tags,
-            metrics=metrics,
-            created_by=db_agent.created_by,
-            created_from_ip=db_agent.created_from_ip,
-            created_via=db_agent.created_via,
-            created_user_agent=db_agent.created_user_agent,
-            modified_by=db_agent.modified_by,
-            modified_from_ip=db_agent.modified_from_ip,
-            modified_via=db_agent.modified_via,
-            modified_user_agent=db_agent.modified_user_agent,
-            import_batch_id=db_agent.import_batch_id,
-            federation_source=db_agent.federation_source,
-            version=db_agent.version,
-            visibility=db_agent.visibility,
-            team_id=db_agent.team_id,
-            team=getattr(db_agent, "team", None),
-            owner_email=db_agent.owner_email,
-        ).masked()
+        # Build dict from ORM model
+        agent_data = {k: getattr(db_agent, k, None) for k in A2AAgentRead.model_fields.keys()}
+        agent_data["metrics"] = metrics
+        agent_data["team"] = getattr(db_agent, "team", None)
+
+        # Validate using Pydantic model
+        validated_agent = A2AAgentRead.model_validate(agent_data)
+
+        # Return masked version (like GatewayRead)
+        return validated_agent.masked()
