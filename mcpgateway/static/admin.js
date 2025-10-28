@@ -3049,6 +3049,22 @@ async function editA2AAgent(agentId) {
 
         // Set form action to the new POST endpoint
 
+        // Handle passthrough headers
+        const passthroughHeadersField = safeGetElement(
+            "edit-a2a-agent-passthrough-headers",
+        );
+        if (passthroughHeadersField) {
+            if (
+                agent.passthroughHeaders &&
+                Array.isArray(agent.passthroughHeaders)
+            ) {
+                passthroughHeadersField.value =
+                    agent.passthroughHeaders.join(", ");
+            } else {
+                passthroughHeadersField.value = "";
+            }
+        }
+
         openModal("a2a-edit-modal");
         console.log("✓ A2A Agent edit modal loaded successfully");
     } catch (err) {
@@ -9046,7 +9062,6 @@ async function handleA2AFormSubmit(e) {
     try {
         // Basic validation
         const name = formData.get("name");
-
         const nameValidation = validateInputName(name, "A2A Agent");
         if (!nameValidation.valid) {
             throw new Error(nameValidation.error);
@@ -9062,6 +9077,32 @@ async function handleA2AFormSubmit(e) {
 
         const isInactiveCheckedBool = isInactiveChecked("a2a-agents");
         formData.append("is_inactive_checked", isInactiveCheckedBool);
+        // Process passthrough headers - convert comma-separated string to array
+        const passthroughHeadersString = formData.get("passthrough_headers");
+        if (passthroughHeadersString && passthroughHeadersString.trim()) {
+            // Split by comma and clean up each header name
+            const passthroughHeaders = passthroughHeadersString
+                .split(",")
+                .map((header) => header.trim())
+                .filter((header) => header.length > 0);
+
+            // Validate each header name
+            for (const headerName of passthroughHeaders) {
+                if (!HEADER_NAME_REGEX.test(headerName)) {
+                    showErrorMessage(
+                        `Invalid passthrough header name: "${headerName}". Only letters, numbers, and hyphens are allowed.`,
+                    );
+                    return;
+                }
+            }
+
+            // Remove the original string and add as JSON array
+            formData.delete("passthrough_headers");
+            formData.append(
+                "passthrough_headers",
+                JSON.stringify(passthroughHeaders),
+            );
+        }
 
         // Handle auth_headers JSON field
         const authHeadersJson = formData.get("auth_headers");
@@ -9403,7 +9444,6 @@ async function handleEditA2AAgentFormSubmit(e) {
             throw new Error(urlValidation.error);
         }
 
-        /*
         // Handle passthrough headers
         const passthroughHeadersString =
             formData.get("passthrough_headers") || "";
@@ -9426,7 +9466,6 @@ async function handleEditA2AAgentFormSubmit(e) {
             "passthrough_headers",
             JSON.stringify(passthroughHeaders),
         );
-        */
 
         // Handle OAuth configuration
         // NOTE: OAuth config assembly is now handled by the backend (mcpgateway/admin.py)

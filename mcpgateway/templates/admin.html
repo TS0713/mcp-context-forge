@@ -5453,7 +5453,7 @@ Hello &#123;&#123; name &#125;&#125;, welcome to &#123;&#123; company &#125;&#12
         </div>
 
                 <!-- A2A Agents List -->
-        <div class="bg-white shadow rounded-lg p-6 mb-6 dark:bg-gray-800">
+        <div class="bg-white shadow rounded-lg p-4 mb-4 dark:bg-gray-800">
           <div class="p-0">
             <h3
               class="text-lg font-medium text-gray-900 dark:text-gray-200 mb-4"
@@ -6138,6 +6138,27 @@ Hello &#123;&#123; name &#125;&#125;, welcome to &#123;&#123; company &#125;&#12
                   </div>
                 </div>
               </div>
+
+              <div class="sm:col-span-2 max-w-5xl">
+                <label
+                  for="passthrough_headers"
+                  class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Passthrough Headers
+                </label>
+                <input
+                  type="text"
+                  name="passthrough_headers"
+                  placeholder="Authorization, X-Tenant-Id, X-Trace-Id"
+                  class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm
+                        focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                />
+                <small class="block mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  List of headers to pass through from client requests (comma-separated, e.g.,
+                  "Authorization, X-Tenant-Id, X-Trace-Id").
+                </small>
+              </div>
+
 
               <!-- Error Display -->
               <span
@@ -8803,6 +8824,27 @@ Hello &#123;&#123; name &#125;&#125;, welcome to &#123;&#123; company &#125;&#12
                             <span class="ml-2 text-sm text-gray-700 dark:text-gray-400">🔒 Private</span>
                           </label>
                         </div>
+                      </div>
+                      
+                      <div>
+                        <label
+                          class="block text-sm font-medium text-gray-700 dark:text-gray-400"
+                          >Passthrough Headers</label
+                        >
+                        <small
+                          class="text-gray-500 dark:text-gray-400 block mb-2"
+                        >
+                          List of headers to pass through from client requests
+                          (comma-separated, e.g., "Authorization, X-Tenant-Id,
+                          X-Trace-Id"). Leave empty to use global defaults.
+                        </small>
+                        <input
+                          type="text"
+                          name="passthrough_headers"
+                          id="edit-a2a-agent-passthrough-headers"
+                          placeholder="Authorization, X-Tenant-Id, X-Trace-Id"
+                          class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:placeholder-gray-300 dark:text-gray-300"
+                        />
                       </div>
 
                       <!-- Hidden Config Fields -->

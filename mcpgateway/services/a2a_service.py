@@ -250,6 +250,7 @@ class A2AAgentService:
                 auth_value=auth_value,  # This should be encrypted in practice
                 oauth_config=oauth_config,
                 tags=agent_data.tags,
+                passthrough_headers=getattr(agent_data, "passthrough_headers", None),
                 # Team scoping fields - use schema values if provided, otherwise fallback to parameters
                 team_id=getattr(agent_data, "team_id", None) or team_id,
                 owner_email=getattr(agent_data, "owner_email", None) or owner_email or created_by,
@@ -618,7 +619,25 @@ class A2AAgentService:
                         raise A2AAgentNameConflictError(name=new_slug, is_active=existing_agent.enabled, agent_id=existing_agent.id, visibility=existing_agent.visibility)
             # Update fields
             update_data = agent_data.model_dump(exclude_unset=True)
+
             for field, value in update_data.items():
+                if field == "passthrough_headers":
+                    if value is not None:
+                        if isinstance(value, list):
+                            # Clean list: remove empty or whitespace-only entries
+                            cleaned = [h.strip() for h in value if isinstance(h, str) and h.strip()]
+                            agent.passthrough_headers = cleaned or None
+                        elif isinstance(value, str):
+                            # Parse comma-separated string and clean
+                            parsed: List[str] = [h.strip() for h in value.split(",") if h.strip()]
+                            agent.passthrough_headers = parsed or None
+                        else:
+                            raise A2AAgentError("Invalid passthrough_headers format: must be list[str] or comma-separated string")
+                    else:
+                        # Explicitly set to None if value is None
+                        agent.passthrough_headers = None
+                    continue
+
                 if hasattr(agent, field):
                     setattr(agent, field, value)
 

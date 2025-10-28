@@ -2571,6 +2571,9 @@ class A2AAgent(Base):
     # OAuth configuration
     oauth_config: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True, comment="OAuth 2.0 configuration including grant_type, client_id, encrypted client_secret, URLs, and scopes")
 
+    # Header passthrough configuration
+    passthrough_headers: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)  # Store list of strings as JSON array
+
     # Status and metadata
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     reachable: Mapped[bool] = mapped_column(Boolean, default=True)

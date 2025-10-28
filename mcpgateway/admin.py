@@ -9607,8 +9607,15 @@ async def admin_add_a2a_agent(
                 LOGGER.info(f"✅ Assembled OAuth config from UI form fields: grant_type={oauth_grant_type}, issuer={oauth_issuer}")
                 LOGGER.info(f"DEBUG: Complete oauth_config = {oauth_config}")
 
-        # TODO
-        # Handle passthrough_headers
+        passthrough_headers = str(form.get("passthrough_headers"))
+        if passthrough_headers and passthrough_headers.strip():
+            try:
+                passthrough_headers = json.loads(passthrough_headers)
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to comma-separated parsing
+                passthrough_headers = [h.strip() for h in passthrough_headers.split(",") if h.strip()]
+        else:
+            passthrough_headers = None
 
         # Auto-detect OAuth: if oauth_config is present and auth_type not explicitly set, use "oauth"
         auth_type_from_form = str(form.get("auth_type", ""))
@@ -9637,6 +9644,7 @@ async def admin_add_a2a_agent(
             visibility=form.get("visibility", "private"),
             team_id=team_id,
             owner_email=user_email,
+            passthrough_headers=passthrough_headers,
         )
 
         LOGGER.info(f"Creating A2A agent: {agent_data.name} at {agent_data.endpoint_url}")
@@ -9714,6 +9722,7 @@ async def admin_edit_a2a_agent(
       - team_id (optional)
       - capabilities (JSON, optional)
       - config (JSON, optional)
+      - passthrough_headers: Optional[List[str]]
 
     Args:
         agent_id (str): The ID of the agent being edited.
@@ -9841,17 +9850,16 @@ async def admin_edit_a2a_agent(
             except (json.JSONDecodeError, ValueError):
                 auth_headers = []
 
-        """
         # Passthrough headers
-        passthrough_headers = None
-        if form.get("passthrough_headers"):
-            raw = str(form.get("passthrough_headers"))
+        passthrough_headers = str(form.get("passthrough_headers"))
+        if passthrough_headers and passthrough_headers.strip():
             try:
-                passthrough_headers = json.loads(raw)
-            except (ValueError, json.JSONDecodeError):
-                passthrough_headers = [h.strip() for h in raw.split(",") if h.strip()]
-
-        """
+                passthrough_headers = json.loads(passthrough_headers)
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to comma-separated parsing
+                passthrough_headers = [h.strip() for h in passthrough_headers.split(",") if h.strip()]
+        else:
+            passthrough_headers = None
 
         # Parse OAuth configuration - support both JSON string and individual form fields
         oauth_config_json = str(form.get("oauth_config"))
@@ -9941,6 +9949,7 @@ async def admin_edit_a2a_agent(
             auth_header_value=str(form.get("auth_header_value", "")),
             auth_value=str(form.get("auth_value", "")),
             auth_headers=auth_headers if auth_headers else None,
+            passthrough_headers=passthrough_headers,
             oauth_config=oauth_config,
             visibility=visibility,
             team_id=team_id,
