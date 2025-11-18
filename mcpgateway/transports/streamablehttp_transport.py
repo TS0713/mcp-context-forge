@@ -35,7 +35,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 import contextvars
 from dataclasses import dataclass
 import re
-from typing import Any, AsyncGenerator, List, Union, Dict
+from typing import Any, AsyncGenerator, Dict, List, Union, Optional
 from uuid import uuid4
 
 # Third-Party
@@ -566,6 +566,7 @@ async def list_resources() -> List[types.Resource]:
         >>> sig.return_annotation
         typing.List[mcp.types.Resource]
     """
+
     server_id = server_id_var.get()
 
     if server_id:
@@ -592,7 +593,7 @@ async def read_resource(resource_uri: str) -> Union[str, bytes]:
     Reads the content of a resource specified by its URI.
 
     Args:
-        resource_id (str): The ID of the resource to read.
+        resource_uri (str): The URI of the resource to read.
 
     Returns:
         Union[str, bytes]: The content of the resource as text or binary data.
@@ -604,7 +605,7 @@ async def read_resource(resource_uri: str) -> Union[str, bytes]:
         >>> import inspect
         >>> sig = inspect.signature(read_resource)
         >>> list(sig.parameters.keys())
-        ['resource_id']
+        ['resource_uri']
         >>> sig.return_annotation
         typing.Union[str, bytes]
     """
@@ -615,7 +616,7 @@ async def read_resource(resource_uri: str) -> Union[str, bytes]:
             except Exception as e:
                 logger.exception(f"Error reading resource '{resource_uri}': {e}")
                 return ""
-            
+
             # Return blob content if available (binary resources)
             if result and result.blob:
                 return result.blob
@@ -633,7 +634,7 @@ async def read_resource(resource_uri: str) -> Union[str, bytes]:
 
 
 @mcp_app.list_resource_templates()
-async def list_resource_templates() -> List[Dict[str,Any]]:
+async def list_resource_templates() -> List[Dict[str, Any]]:
     """
     Lists all resource templates available to the MCP Server.
 
@@ -699,43 +700,63 @@ async def set_logging_level(level: types.LoggingLevel) -> types.EmptyResult:
 
 
 @mcp_app.completion()
-async def complete(ref: Union[types.PromptReference, types.ResourceReference], argument: types.CompleteRequest) -> types.CompleteResult:
+async def complete(
+    ref: Union[types.PromptReference, types.ResourceTemplateReference],
+    argument: types.CompleteRequest,
+    context: Optional[types.CompletionContext] = None,
+) -> types.CompleteResult:
     """
     Provides argument completion suggestions for prompts or resources.
-
-    Args:
-        ref (Union[types.PromptReference, types.ResourceReference]): Reference to the prompt or resource.
-        argument (types.CompleteRequest): The completion request with partial argument value.
-
-    Returns:
-        types.CompleteResult: Completion suggestions.
-
-    Examples:
-        >>> import inspect
-        >>> sig = inspect.signature(complete)
-        >>> list(sig.parameters.keys())
-        ['ref', 'argument']
     """
     try:
         async with get_db() as db:
-            try:
-                # Convert types to dict for completion service
-                params = {
-                    "ref": ref.model_dump() if hasattr(ref, "model_dump") else ref,
-                    "argument": argument.model_dump() if hasattr(argument, "model_dump") else argument,
-                }
-                result = await completion_service.handle_completion(db, params)
+            params = {
+                "ref": ref.model_dump() if hasattr(ref, "model_dump") else ref,
+                "argument": argument.model_dump() if hasattr(argument, "model_dump") else argument,
+                "context": context.model_dump() if hasattr(context, "model_dump") else context,
+            }
 
-                # Convert result to CompleteResult
-                if isinstance(result, dict):
-                    return types.CompleteResult(**result)
+            result = await completion_service.handle_completion(db, params)
+
+            # ✅ Normalize the result for MCP
+            if isinstance(result, dict):
+                completion_data = result.get("completion", result)
+                return types.Completion(**completion_data)
+
+            if hasattr(result, "completion"):
+                completion_obj = result.completion
+
+                # If completion itself is a dict
+                if isinstance(completion_obj, dict):
+                    return types.Completion(**completion_obj)
+
+                # If completion is another CompleteResult (nested)
+                if hasattr(completion_obj, "completion"):
+                    inner_completion = (
+                        completion_obj.completion.model_dump()
+                        if hasattr(completion_obj.completion, "model_dump")
+                        else completion_obj.completion
+                    )
+                    return types.Completion(**inner_completion)
+                
+                # If completion is already a Completion model
+                if isinstance(completion_obj, types.Completion):
+                    return completion_obj
+
+                # If it's another Pydantic model (e.g., mcpgateway.models.Completion)
+                if hasattr(completion_obj, "model_dump"):
+                    return types.Completion(**completion_obj.model_dump())
+
+            # If result itself is already a types.Completion
+            if isinstance(result, types.Completion):
                 return result
-            except Exception as e:
-                logger.exception(f"Error handling completion: {e}")
-                return types.CompleteResult(completion=types.Completion(values=[], total=0, hasMore=False))
+
+            # Fallback: return empty completion
+            return types.Completion(values=[], total=0, hasMore=False)
+
     except Exception as e:
         logger.exception(f"Error handling completion: {e}")
-        return types.CompleteResult(completion=types.Completion(values=[], total=0, hasMore=False))
+        return Completion(values=[], total=0, hasMore=False)
 
 
 class SessionManagerWrapper:

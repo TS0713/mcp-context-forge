@@ -716,7 +716,7 @@ class ResourceTemplate(BaseModelWithConfigDict):
     """
 
     # ✅ DB field name: uri_template
-    # ✅ API (JSON) alias: 
+    # ✅ API (JSON) alias:
     id: Optional[int] = None
     uri_template: str = Field(..., alias="uriTemplate")
     name: str

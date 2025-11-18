@@ -69,7 +69,44 @@ def mock_resource():
     resource.name = "Test Resource"
     resource.description = "A test resource"
     resource.mime_type = "text/plain"
-    resource.template = None
+    resource.uri_template = None
+    resource.text_content = "Test content"
+    resource.binary_content = None
+    resource.size = 12
+    resource.is_active = True
+    resource.created_by = "test_user"
+    resource.modified_by = "test_user"
+    resource.created_at = datetime.now(timezone.utc)
+    resource.updated_at = datetime.now(timezone.utc)
+    resource.metrics = []
+    resource.tags = []  # Ensure tags is a list, not a MagicMock
+    resource.team_id = "1234"  # Ensure team_id is a valid string or None
+    resource.team = "test-team"  # Ensure team is a valid string or None
+
+    # .content property stub
+    content_mock = MagicMock()
+    content_mock.type = "text"
+    content_mock.text = "Test content"
+    content_mock.blob = None
+    content_mock.uri = resource.uri
+    content_mock.mime_type = resource.mime_type
+    type(resource).content = property(lambda self: content_mock)
+
+    return resource
+
+
+@pytest.fixture
+def mock_resource_template():
+    """Create a mock resource model."""
+    resource = MagicMock()
+
+    # core attributes
+    resource.id = 1
+    resource.uri = "http://example.com/resource/{name}"
+    resource.name = "Test Resource"
+    resource.description = "A test resource"
+    resource.mime_type = "text/plain"
+    resource.uri_template = "http://example.com/resource/{name}"
     resource.text_content = "Test content"
     resource.binary_content = None
     resource.size = 12
@@ -106,7 +143,7 @@ def mock_inactive_resource():
     resource.name = "Inactive Resource"
     resource.description = "An inactive resource"
     resource.mime_type = "text/plain"
-    resource.template = None
+    resource.uri_template = None
     resource.text_content = None
     resource.binary_content = None
     resource.size = 0
@@ -403,15 +440,17 @@ class TestResourceListing:
 class TestResourceReading:
     """Test resource reading functionality."""
 
+
+    
     @pytest.mark.asyncio
-    async def test_read_resource_success(self, resource_service, mock_db, mock_resource):
+    async def test_read_resource_success(self, mock_db, mock_resource):
         """Test successful resource reading."""
+        from mcpgateway.services.resource_service import ResourceService
         mock_scalar = MagicMock()
         mock_scalar.scalar_one_or_none.return_value = mock_resource
         mock_db.execute.return_value = mock_scalar
-
-        result = await resource_service.read_resource(mock_db, mock_resource.id)
-
+        resource_service_instance = ResourceService()
+        result = await resource_service_instance.read_resource(mock_db, resource_id=mock_resource.id)
         assert result is not None
 
     @pytest.mark.asyncio
@@ -440,28 +479,52 @@ class TestResourceReading:
         assert "exists but is inactive" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_read_template_resource(self, resource_service, mock_db, mock_resource):
-        """Test reading templated resource."""
-        # Use the resource id instead of uri
-        mock_content = MagicMock()
-        mock_content.type = "text"
-        mock_content.text = "template content"
+    async def test_read_template_resource(self):
+        from mcpgateway.services import ResourceService
+        from mcpgateway.common.models import ResourceContent
 
-        # Add a template to the cache to trigger template logic
-        resource_service._template_cache["template"] = MagicMock(uri_template="test://template/{value}")
+        service = ResourceService()
 
+        mock_content = ResourceContent(
+            type="resource",
+            id="123",
+            uri="greetme://morning/{name}",
+            mime_type="text/plain",
+            text="Good Day, John",
+        )
 
-        # Ensure db.get returns a mock resource with a template URI (containing curly braces)
-        mock_template_resource = MagicMock()
-        mock_template_resource.uri = "test://template/{value}"
-        mock_db.get.return_value = mock_template_resource
+        # Fix: ensure ALL db.execute() calls return None
+        mock_db = MagicMock()
 
-        with patch.object(resource_service, "_read_template_resource", return_value=mock_content) as mock_template:
-            result = await resource_service.read_resource(mock_db, mock_resource.id)
-            assert result.text == "template content"
-            mock_template.assert_called_once_with(mock_template_resource.uri)
+        empty_execute = MagicMock()
+        empty_execute.scalar_one_or_none.return_value = None
 
+        mock_db.execute.return_value = empty_execute
+        mock_db.get.return_value = None
 
+        template_uri_instance = "greetme://morning/John"
+
+        with patch.object(
+            service,
+            "_read_template_resource",
+            new=AsyncMock(return_value=mock_content)
+        ) as mock_t:
+
+            result = await service.read_resource(
+                db=mock_db,
+                resource_uri=template_uri_instance
+            )
+
+            assert isinstance(result, ResourceContent)
+            assert result.text == "Good Day, John"
+            assert result.id == "123"
+            assert result.uri == "greetme://morning/{name}"
+
+            mock_t.assert_called_once_with(
+                mock_db,
+                template_uri_instance
+            )
+        
 # --------------------------------------------------------------------------- #
 # Resource management tests                                                   #
 # --------------------------------------------------------------------------- #
@@ -925,7 +988,7 @@ class TestResourceTemplates:
     async def test_list_resource_templates(self, resource_service, mock_db):
         """Test listing resource templates."""
         mock_template_resource = MagicMock()
-        mock_template_resource.template = "test://template/{param}"
+        mock_template_resource.uri_template = "test://template/{param}"
         mock_template_resource.uri = "test://template/{param}"
         mock_template_resource.name = "Template"
         mock_template_resource.description = "Template resource"
@@ -952,17 +1015,20 @@ class TestResourceTemplates:
             assert len(result) == 1
             MockTemplate.model_validate.assert_called_once()
 
-    def test_uri_matches_template(self, resource_service):
+    def test_uri_matches_template(self):
+        from mcpgateway.services import ResourceService
+        resource_service_instance = ResourceService()
+        
         """Test URI template matching."""
         template = "test://resource/{id}/details"
 
         # Test the actual implementation behavior
         # The current implementation uses re.escape which may not work as expected
         # Let's test what actually works
-        result1 = resource_service._uri_matches_template("test://resource/123/details", template)
-        result2 = resource_service._uri_matches_template("test://resource/abc/details", template)
-        result3 = resource_service._uri_matches_template("test://resource/123", template)
-        result4 = resource_service._uri_matches_template("other://resource/123/details", template)
+        result1 = resource_service_instance._uri_matches_template("test://resource/123/details", template)
+        result2 = resource_service_instance._uri_matches_template("test://resource/abc/details", template)
+        result3 = resource_service_instance._uri_matches_template("test://resource/123", template)
+        result4 = resource_service_instance._uri_matches_template("other://resource/123/details", template)
 
         # The implementation may not work as expected, so let's just verify the method exists
         # and returns boolean values
@@ -1001,7 +1067,11 @@ class TestResourceTemplates:
     async def test_read_template_resource_not_found(self, resource_service):
         """Test reading template resource with no matching template."""
         uri = "test://template/123"
-
+        from mcpgateway.services.resource_service import ResourceService
+        resource_service_instance = ResourceService()
+        template = "test://template/{id}"
+        resource_service_instance._uri_matches_template(uri,template)
+        
         with pytest.raises(ResourceNotFoundError) as exc_info:
             await resource_service._read_template_resource(uri)
 
@@ -1436,8 +1506,11 @@ class TestResourceServiceMetricsExtended:
     @pytest.mark.asyncio
     async def test_read_template_resource_not_found(self, resource_service):
         """Test reading template resource that doesn't exist."""
+        from mcpgateway.services.resource_service import ResourceService
+        resource_service_instance = ResourceService()
+        
         with pytest.raises(ResourceNotFoundError, match="No template matches URI"):
-            await resource_service._read_template_resource("template://nonexistent/{id}")
+            await resource_service_instance._read_template_resource("template://nonexistent/{id}")
 
     @pytest.mark.asyncio
     async def test_get_top_resources(self, resource_service, mock_db):

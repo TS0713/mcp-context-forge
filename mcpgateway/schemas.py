@@ -1776,6 +1776,7 @@ class ResourceRead(BaseModelWithConfigDict):
     name: str
     description: Optional[str]
     mime_type: Optional[str]
+    uri_template: Optional[str] = Field(None, description="URI template for parameterized resources")
     size: Optional[int]
     created_at: datetime
     updated_at: datetime
