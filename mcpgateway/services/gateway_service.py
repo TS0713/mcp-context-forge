@@ -2948,7 +2948,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                         name=resource.name,
                         description=resource.description,
                         mime_type=resource.mime_type,
-                        template=resource.uri_template,
+                        uri_template=resource.uri_template,
                         gateway_id=gateway.id,
                         created_by="system",
                         created_via=created_via,
@@ -3085,9 +3085,10 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                     if tools:
                         logger.info(f"Fetched {len(tools)} tools from gateway")
                     # Fetch resources if supported
-                    resources = []
+                    
                     logger.debug(f"Checking for resources support: {capabilities.get('resources')}")
                     if capabilities.get("resources"):
+                        resources = []
                         try:
                             response = await session.list_resources()
                             raw_resources = response.resources
@@ -3100,7 +3101,11 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                 if "content" not in resource_data:
                                     resource_data["content"] = ""
                                 try:
+<<<<<<< HEAD
                                     resources.append(ResourceCreate.model_validate(resource_data))
+=======
+                                  resources.append(ResourceCreate.model_validate(resource_data))
+>>>>>>> 74448023 (few pytests fixed, minor change in alembic script and other fixes)
                                 except Exception:
                                     # If validation fails, create minimal resource
                                     resources.append(
@@ -3124,8 +3129,8 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                             resource_templates = []
                             for resource_template in raw_resources_templates:
                                 resource_template_data = resource_template.model_dump(by_alias=True, exclude_none=True)
-                                    
-                                if "uriTemplate" in resource_template_data:# and hasattr(resource_template_data["uriTemplate"], "unicode_string"):
+
+                                if "uriTemplate" in resource_template_data:  # and hasattr(resource_template_data["uriTemplate"], "unicode_string"):
                                     resource_template_data["uri_template"] = str(resource_template_data["uriTemplate"])
                                     resource_template_data["uri"] = str(resource_template_data["uriTemplate"])
 
@@ -3223,6 +3228,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                 tools = response.tools
                 tools = [tool.model_dump(by_alias=True, exclude_none=True) for tool in tools]
 
+<<<<<<< HEAD
                 tools = [ToolCreate.model_validate(tool) for tool in tools]
                 if tools:
                     logger.info(f"Fetched {len(tools)} tools from gateway")
@@ -3247,6 +3253,33 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                 # If validation fails, create minimal resource
                                 resources.append(
                                     ResourceCreate(
+=======
+                    tools = [ToolCreate.model_validate(tool) for tool in tools]
+                    if tools:
+                        logger.info(f"Fetched {len(tools)} tools from gateway")
+                    # Fetch resources if supported
+                    
+                    logger.debug(f"Checking for resources support: {capabilities.get('resources')}")
+                    if capabilities.get("resources"):
+                        resources = []
+                        try:
+                            response = await session.list_resources()
+                            raw_resources = response.resources
+                            for resource in raw_resources:
+                                resource_data = resource.model_dump(by_alias=True, exclude_none=True)
+                                # Convert AnyUrl to string if present
+                                if "uri" in resource_data and hasattr(resource_data["uri"], "unicode_string"):
+                                    resource_data["uri"] = str(resource_data["uri"])
+                                # Add default content if not present (will be fetched on demand)
+                                if "content" not in resource_data:
+                                    resource_data["content"] = ""
+                                try:
+                                  resources.append(ResourceCreate.model_validate(resource_data))
+                                except Exception:
+                                    # If validation fails, create minimal resource
+                                    resources.append(
+                                        ResourceCreate(
+>>>>>>> 74448023 (few pytests fixed, minor change in alembic script and other fixes)
                                             uri=str(resource_data.get("uri", "")),
                                             name=resource_data.get("name", ""),
                                             description=resource_data.get("description"),
@@ -3254,20 +3287,28 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                             uri_template=resource_data.get("uriTemplate") or None,
                                             content="",
                                         )
+<<<<<<< HEAD
                                 )
                         logger.info(f"Fetched {len(resources)} resources from gateway")
                     except Exception as e:
                         logger.warning(f"Failed to fetch resources: {e}")
 
                     ## resource template URI
+=======
+                                    )
+                            logger.info(f"Fetched {len(resources)} resources from gateway")
+                        except Exception as e:
+                            logger.warning(f"Failed to fetch resources: {e}")
+                        ## resource template URI
+>>>>>>> 74448023 (few pytests fixed, minor change in alembic script and other fixes)
                         try:
                             response_templates = await session.list_resource_templates()
                             raw_resources_templates = response_templates.resourceTemplates
                             resource_templates = []
                             for resource_template in raw_resources_templates:
                                 resource_template_data = resource_template.model_dump(by_alias=True, exclude_none=True)
-                                    
-                                if "uriTemplate" in resource_template_data:# and hasattr(resource_template_data["uriTemplate"], "unicode_string"):
+
+                                if "uriTemplate" in resource_template_data:  # and hasattr(resource_template_data["uriTemplate"], "unicode_string"):
                                     resource_template_data["uri_template"] = str(resource_template_data["uriTemplate"])
                                     resource_template_data["uri"] = str(resource_template_data["uriTemplate"])
 
@@ -3410,8 +3451,8 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                             resource_templates = []
                             for resource_template in raw_resources_templates:
                                 resource_template_data = resource_template.model_dump(by_alias=True, exclude_none=True)
-                                    
-                                if "uriTemplate" in resource_template_data:# and hasattr(resource_template_data["uriTemplate"], "unicode_string"):
+
+                                if "uriTemplate" in resource_template_data:  # and hasattr(resource_template_data["uriTemplate"], "unicode_string"):
                                     resource_template_data["uri_template"] = str(resource_template_data["uriTemplate"])
                                     resource_template_data["uri"] = str(resource_template_data["uriTemplate"])
 
@@ -3423,7 +3464,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                             logger.info(f"Fetched {len(resource_templates)} resource templates from gateway")
                         except Exception as e:
                             logger.warning(f"Failed to fetch resource templates: {e}")
-                            
+
                     # Fetch prompts if supported
                     prompts = []
                     logger.debug(f"Checking for prompts support: {capabilities.get('prompts')}")
