@@ -7599,8 +7599,15 @@ async def admin_add_resource(request: Request, db: Session = Depends(get_db), us
 
     try:
         # Handle template field: convert empty string to None for optional field
+        template = None
         template_value = form.get("uri_template")
         template = template_value if template_value else None
+        template_value = form.get("uri_template")
+        uri_value = form.get("uri")
+
+        # Ensure uri_value is a string
+        if isinstance(uri_value, str) and "{" in uri_value and "}" in uri_value:
+            template = uri_value
 
         resource = ResourceCreate(
             uri=str(form["uri"]),

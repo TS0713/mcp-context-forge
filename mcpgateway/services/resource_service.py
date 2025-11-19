@@ -738,14 +738,14 @@ class ResourceService:
         elif resource_uri:
             resource_db = db.execute(select(DbResource).where(DbResource.uri == str(resource_uri))).scalar_one_or_none()
             if resource_db:
-                resource_id = resource_db.id or None
+                #resource_id = resource_db.id or None
                 uri = resource_db.uri or None
                 original_uri = resource_db.uri or None
             else:
                 content = await self._read_template_resource(db, resource_uri) or None
                 uri = content.uri
                 original_uri = content.uri
-                resource_id = content.id
+                #resource_id = content.id
 
         # Create database span for observability dashboard
         trace_id = current_trace_id.get()
@@ -856,7 +856,6 @@ class ResourceService:
                         else:
                             # Attempt to fallback to attribute access
                             user_id = getattr(user, "email", None)
-
                     global_context = GlobalContext(request_id=request_id, user=user_id, server_id=server_id)
 
                     # Create pre-fetch payload
