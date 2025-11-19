@@ -3087,8 +3087,8 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                     # Fetch resources if supported
                     
                     logger.debug(f"Checking for resources support: {capabilities.get('resources')}")
+                    resources = []
                     if capabilities.get("resources"):
-                        resources = []
                         try:
                             response = await session.list_resources()
                             raw_resources = response.resources
@@ -3260,8 +3260,8 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                     # Fetch resources if supported
                     
                     logger.debug(f"Checking for resources support: {capabilities.get('resources')}")
+                    resources = []
                     if capabilities.get("resources"):
-                        resources = []
                         try:
                             response = await session.list_resources()
                             raw_resources = response.resources
@@ -3417,7 +3417,6 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                         try:
                             response = await session.list_resources()
                             raw_resources = response.resources
-                            resources = []
                             for resource in raw_resources:
                                 resource_data = resource.model_dump(by_alias=True, exclude_none=True)
                                 # Convert AnyUrl to string if present
