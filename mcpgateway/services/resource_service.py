@@ -1703,6 +1703,8 @@ class ResourceService:
             True
         """
         query = select(DbResource).where(DbResource.uri_template.isnot(None))
+        if not include_inactive:
+            query = query.where(DbResource.is_active)
         # Cursor-based pagination logic can be implemented here in the future.
         templates = db.execute(query).scalars().all()
         result = [ResourceTemplate.model_validate(t) for t in templates]
