@@ -689,13 +689,13 @@ class ResourceService:
         """Read a resource's content with plugin hook support.
 
         Args:
-            db: Database session
-            resource_id: Optional ID of the resource to read
-            resource_uri: Optional URI of the resource to read
-            request_id: Optional request ID for tracing
-            user: Optional user making the request
-            server_id: Optional server ID for context
-            include_inactive: Optional False
+            db: Database session.
+            resource_id: Optional ID of the resource to read.
+            resource_uri: Optional URI of the resource to read.
+            request_id: Optional request ID for tracing.
+            user: Optional user making the request.
+            server_id: Optional server ID for context.
+            include_inactive: Whether to include inactive resources. Defaults to False.
 
         Returns:
             Resource content object
@@ -715,20 +715,22 @@ class ResourceService:
             >>> db = MagicMock()
             >>> uri = 'http://example.com/resource.txt'
             >>> import types
-            >>> mock_resource = types.SimpleNamespace(content='test', uri=uri)
+            >>> mock_resource = types.SimpleNamespace(id=123,content='test', uri=uri)
             >>> db.execute.return_value.scalar_one_or_none.return_value = mock_resource
-            >>> db.get.return_value = mock_resource  # Ensure uri is a string, not None
+            >>> db.get.return_value = mock_resource
             >>> import asyncio
-            >>> result = asyncio.run(service.read_resource(db, uri))
+            >>> result = asyncio.run(service.read_resource(db, resource_uri=uri))
             >>> isinstance(result, ResourceContent)
             True
 
-            Not found case returns ResourceNotFoundError:
+        Not found case returns ResourceNotFoundError:
+
             >>> db2 = MagicMock()
             >>> db2.execute.return_value.scalar_one_or_none.return_value = None
+            >>> import asyncio
             >>> def _nf():
             ...     try:
-            ...         asyncio.run(service.read_resource(db2, 'abc'))
+            ...         asyncio.run(service.read_resource(db2, resource_uri='abc'))
             ...     except ResourceNotFoundError:
             ...         return True
             >>> _nf()
