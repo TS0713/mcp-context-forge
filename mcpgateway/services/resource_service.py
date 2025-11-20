@@ -1604,7 +1604,7 @@ class ResourceService:
         """
         result = parse.parse(template, uri)
         return result.named if result else {}
-    
+
     def _uri_matches_template(self, uri: str, template: str) -> bool:
         """
         Check whether a URI matches a given template pattern.
