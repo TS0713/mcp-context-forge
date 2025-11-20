@@ -1256,7 +1256,7 @@ class TestGatewayServiceExtended:
         # existing_resource3 should be updated
         assert existing_resource3.description == "Updated description"
         assert existing_resource3.mime_type == "application/json"
-        assert existing_resource3.template == "new template"
+        assert existing_resource3.uri_template == "new template"
         assert existing_resource3.visibility == "public"  # Updated from gateway
 
     @pytest.mark.asyncio

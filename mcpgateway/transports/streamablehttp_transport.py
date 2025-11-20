@@ -35,7 +35,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 import contextvars
 from dataclasses import dataclass
 import re
-from typing import Any, AsyncGenerator, Dict, List, Union, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 from uuid import uuid4
 
 # Third-Party
@@ -707,6 +707,23 @@ async def complete(
 ) -> types.CompleteResult:
     """
     Provides argument completion suggestions for prompts or resources.
+
+    Args:
+        ref: A reference to a prompt or a resource template. Can be either
+            `types.PromptReference` or `types.ResourceTemplateReference`.
+        argument: The completion request specifying the input text and
+            position for which completion suggestions should be generated.
+        context: Optional contextual information for the completion request,
+            such as user, environment, or invocation metadata.
+
+    Returns:
+        types.CompleteResult: A normalized completion result containing
+        completion values, metadata (total, hasMore), and any additional
+        MCP-compliant completion fields.
+
+    Raises:
+        Exception: If completion handling fails internally. The method
+            logs the exception and returns an empty completion structure.
     """
     try:
         async with get_db() as db:
@@ -732,13 +749,9 @@ async def complete(
 
                 # If completion is another CompleteResult (nested)
                 if hasattr(completion_obj, "completion"):
-                    inner_completion = (
-                        completion_obj.completion.model_dump()
-                        if hasattr(completion_obj.completion, "model_dump")
-                        else completion_obj.completion
-                    )
+                    inner_completion = completion_obj.completion.model_dump() if hasattr(completion_obj.completion, "model_dump") else completion_obj.completion
                     return types.Completion(**inner_completion)
-                
+
                 # If completion is already a Completion model
                 if isinstance(completion_obj, types.Completion):
                     return completion_obj
@@ -756,7 +769,7 @@ async def complete(
 
     except Exception as e:
         logger.exception(f"Error handling completion: {e}")
-        return Completion(values=[], total=0, hasMore=False)
+        return types.Completion(values=[], total=0, hasMore=False)
 
 
 class SessionManagerWrapper:

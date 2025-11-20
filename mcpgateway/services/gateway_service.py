@@ -3085,7 +3085,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                     if tools:
                         logger.info(f"Fetched {len(tools)} tools from gateway")
                     # Fetch resources if supported
-                    
+
                     logger.debug(f"Checking for resources support: {capabilities.get('resources')}")
                     resources = []
                     if capabilities.get("resources"):
@@ -3101,7 +3101,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                 if "content" not in resource_data:
                                     resource_data["content"] = ""
                                 try:
-                                  resources.append(ResourceCreate.model_validate(resource_data))
+                                    resources.append(ResourceCreate.model_validate(resource_data))
                                 except Exception:
                                     # If validation fails, create minimal resource
                                     resources.append(
@@ -3118,7 +3118,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                         except Exception as e:
                             logger.warning(f"Failed to fetch resources: {e}")
 
-                        ## resource template URI
+                        # resource template URI
                         try:
                             response_templates = await session.list_resource_templates()
                             raw_resources_templates = response_templates.resourceTemplates
@@ -3248,19 +3248,19 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                 # If validation fails, create minimal resource
                                 resources.append(
                                     ResourceCreate(
-                                            uri=str(resource_data.get("uri", "")),
-                                            name=resource_data.get("name", ""),
-                                            description=resource_data.get("description"),
-                                            mime_type=resource_data.get("mimeType"),
-                                            uri_template=resource_data.get("uriTemplate") or None,
-                                            content="",
-                                        )
+                                        uri=str(resource_data.get("uri", "")),
+                                        name=resource_data.get("name", ""),
+                                        description=resource_data.get("description"),
+                                        mime_type=resource_data.get("mimeType"),
+                                        uri_template=resource_data.get("uriTemplate") or None,
+                                        content="",
+                                    )
                                 )
                         logger.info(f"Fetched {len(resources)} resources from gateway")
                     except Exception as e:
                         logger.warning(f"Failed to fetch resources: {e}")
 
-                    ## resource template URI
+                        # resource template URI
                         try:
                             response_templates = await session.list_resource_templates()
                             raw_resources_templates = response_templates.resourceTemplates
@@ -3278,8 +3278,8 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                                 resources.append(ResourceCreate.model_validate(resource_template_data))
                                 resource_templates.append(ResourceCreate.model_validate(resource_template_data))
                             logger.info(f"Fetched {len(raw_resources_templates)} resource templates from gateway")
-                        except Exception as e:
-                            logger.warning(f"Failed to fetch resource templates: {e}")
+                        except Exception as ei:
+                            logger.warning(f"Failed to fetch resource templates: {ei}")
 
                 # Fetch prompts if supported
                 prompts = []
@@ -3403,7 +3403,7 @@ class GatewayService:  # pylint: disable=too-many-instance-attributes
                         except Exception as e:
                             logger.warning(f"Failed to fetch resources: {e}")
 
-                        ## resource template URI
+                        # resource template URI
                         try:
                             response_templates = await session.list_resource_templates()
                             raw_resources_templates = response_templates.resourceTemplates
