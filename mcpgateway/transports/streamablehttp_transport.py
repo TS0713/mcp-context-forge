@@ -35,7 +35,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 import contextvars
 from dataclasses import dataclass
 import re
-from typing import Any, AsyncGenerator, List, Union
+from typing import Any, AsyncGenerator, List, Union, Dict
 from uuid import uuid4
 
 # Third-Party
@@ -587,9 +587,9 @@ async def list_resources() -> List[types.Resource]:
 
 
 @mcp_app.read_resource()
-async def read_resource(resource_id: str) -> Union[str, bytes]:
+async def read_resource(resource_uri: str) -> Union[str, bytes]:
     """
-    Reads the content of a resource specified by its ID.
+    Reads the content of a resource specified by its URI.
 
     Args:
         resource_id (str): The ID of the resource to read.
@@ -611,11 +611,11 @@ async def read_resource(resource_id: str) -> Union[str, bytes]:
     try:
         async with get_db() as db:
             try:
-                result = await resource_service.read_resource(db=db, resource_id=resource_id)
+                result = await resource_service.read_resource(db=db, resource_uri=str(resource_uri))
             except Exception as e:
-                logger.exception(f"Error reading resource '{resource_id}': {e}")
+                logger.exception(f"Error reading resource '{resource_uri}': {e}")
                 return ""
-
+            
             # Return blob content if available (binary resources)
             if result and result.blob:
                 return result.blob
@@ -625,15 +625,15 @@ async def read_resource(resource_id: str) -> Union[str, bytes]:
                 return result.text
 
             # No content found
-            logger.warning(f"No content returned by resource: {resource_id}")
+            logger.warning(f"No content returned by resource: {resource_uri}")
             return ""
     except Exception as e:
-        logger.exception(f"Error reading resource '{resource_id}': {e}")
+        logger.exception(f"Error reading resource '{resource_uri}': {e}")
         return ""
 
 
 @mcp_app.list_resource_templates()
-async def list_resource_templates() -> List[types.ResourceTemplate]:
+async def list_resource_templates() -> List[Dict[str,Any]]:
     """
     Lists all resource templates available to the MCP Server.
 
@@ -652,7 +652,7 @@ async def list_resource_templates() -> List[types.ResourceTemplate]:
         async with get_db() as db:
             try:
                 resource_templates = await resource_service.list_resource_templates(db)
-                return resource_templates
+                return [template.model_dump(by_alias=True) for template in resource_templates]
             except Exception as e:
                 logger.exception(f"Error listing resource templates: {e}")
                 return []

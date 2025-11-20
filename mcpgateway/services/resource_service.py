@@ -671,15 +671,23 @@ class ResourceService:
         db.add(metric)
         db.commit()
 
-    async def read_resource(self, db: Session, resource_id: Union[int, str], request_id: Optional[str] = None, user: Optional[str] = None, server_id: Optional[str] = None) -> ResourceContent:
+    async def read_resource(self, db: Session, 
+                                 resource_id: Optional[Union[int, str]] = None, 
+                                 resource_uri: Optional[str] = None, 
+                                 request_id: Optional[str] = None, 
+                                 user: Optional[str] = None, 
+                                 server_id: Optional[str] = None, 
+                                 include_inactive: Optional[bool]=False) -> ResourceContent:
         """Read a resource's content with plugin hook support.
 
         Args:
             db: Database session
-            resource_id: ID of the resource to read
+            resource_id: Optional ID of the resource to read
+            resource_uri: Optional URI of the resource to read
             request_id: Optional request ID for tracing
             user: Optional user making the request
             server_id: Optional server ID for context
+            include_inactive: Optional False
 
         Returns:
             Resource content object
@@ -721,9 +729,21 @@ class ResourceService:
         success = False
         error_message = None
         resource = None
-        resource_db = db.get(DbResource, resource_id)
-        uri = resource_db.uri if resource_db else None
-
+        if resource_id:
+            resource_db = db.get(DbResource, resource_id)
+            uri = resource_db.uri if resource_db else None
+        elif resource_uri:
+            resource_db = db.execute(select(DbResource).where(DbResource.uri == str(resource_uri)))
+            if resource_db:
+                resource_id = resource_db.id or None
+                uri = resource_db.uri or None
+                original_uri = resource_db.uri or None
+            else:
+                content = await self._read_template_resource(db,resource_uri) or None
+                uri = content.uri
+                original_uri = content.uri
+                resource_id = content.id
+                
         # Create database span for observability dashboard
         trace_id = current_trace_id.get()
         db_span_id = None
@@ -750,28 +770,75 @@ class ResourceService:
                 logger.warning(f"Failed to start observability span for resource reading: {e}")
                 db_span_id = None
 
-        # Create trace span for OpenTelemetry export (Jaeger, Zipkin, etc.)
         with create_span(
             "resource.read",
             {
-                "resource.uri": uri,
+                "resource.uri": str(uri) if uri else "unknown",
                 "user": user or "anonymous",
                 "server_id": server_id,
                 "request_id": request_id,
                 "http.url": uri if uri is not None and uri.startswith("http") else None,
                 "resource.type": "template" if (uri is not None and "{" in uri and "}" in uri) else "static",
-            },
+            }
         ) as span:
             try:
-                # Generate request ID if not provided
+
+                resource_db = None
+                contexts = None
+                original_uri = None
+                content = None
                 if not request_id:
                     request_id = str(uuid.uuid4())
 
-                original_uri = uri
-                contexts = None
+                if resource_id:
+                    query = select(DbResource).where(DbResource.id == str(resource_id)).where(DbResource.is_active)
+                    if include_inactive:
+                        query = select(DbResource).where(DbResource.id == str(resource_id))
+                    resource_db = db.execute(query).scalar_one_or_none()
+                    if resource_db:
+                        original_uri = resource_db.uri or None
+                        content = resource_db.content
+                    else:
+                        check_inactivity = db.execute(select(DbResource).where(DbResource.id == str(resource_id)).where(not_(DbResource.is_active))).scalar_one_or_none()
+                        if check_inactivity:
+                            raise ResourceNotFoundError(
+                                    f"Resource '{resource_id}' exists but is inactive"
+                                )
+                        raise ResourceNotFoundError(f"Resource not found for the resource id: {resource_id}")
+                    
+                if resource_uri:
+                    # Check for static resource templates
+                    query = select(DbResource).where(DbResource.uri == str(resource_uri)).where(DbResource.is_active)
+                    if include_inactive:
+                        query = select(DbResource).where(DbResource.uri == str(resource_uri))
+                    resource_db = db.execute(query).scalar_one_or_none()
+                    if resource_db:
+                        resource_id = resource_db.id
+                        uri = resource_db.uri or None
+                        original_uri = resource_db.uri or None
+                        content = resource_db.content
+                    else:
+                        # Check the inactivity first
+                        check_inactivity = db.execute(select(DbResource).where(DbResource.uri == str(resource_uri)).where(not_(DbResource.is_active))).scalar_one_or_none()
+                        if check_inactivity:
+                            raise ResourceNotFoundError(
+                                    f"Resource '{resource_uri}' exists but is inactive"
+                            )
 
+                        # Check for paramterized uri template with value in place falls into 
+                        # any of the existing parameterized resource templates
+                        
+                        try:
+                            content = await self._read_template_resource(db,resource_uri) or None
+                            original_uri = content.uri
+                        except Exception as e:
+                            raise ResourceNotFoundError(f"Resource template not found for '{resource_uri}'") from e
+                    
+                if resource_id is None and resource_uri is None:
+                    raise ValueError("Either resource_id or resource_uri must be provided")
+                
                 # Call pre-fetch hooks if plugin manager is available
-                plugin_eligible = bool(self._plugin_manager and PLUGINS_AVAILABLE and uri and ("://" in uri))
+                plugin_eligible = bool(self._plugin_manager and PLUGINS_AVAILABLE and original_uri and ("://" in original_uri))
                 if plugin_eligible:
                     # Initialize plugin manager if needed
                     # pylint: disable=protected-access
@@ -782,47 +849,28 @@ class ResourceService:
                     # Create plugin context
                     # Normalize user to an identifier string if provided
                     user_id = None
-                    if user is not None:
-                        if isinstance(user, dict) and "email" in user:
+                    if user is None:
+                        if isinstance(user,dict) and "email" in user:
                             user_id = user.get("email")
-                        elif isinstance(user, str):
+                        elif isinstance(user,str):
                             user_id = user
                         else:
                             # Attempt to fallback to attribute access
                             user_id = getattr(user, "email", None)
-
+                    
                     global_context = GlobalContext(request_id=request_id, user=user_id, server_id=server_id)
 
                     # Create pre-fetch payload
-                    pre_payload = ResourcePreFetchPayload(uri=uri, metadata={})
+                    pre_payload = ResourcePreFetchPayload(uri=original_uri, metadata={})
 
                     # Execute pre-fetch hooks
                     pre_result, contexts = await self._plugin_manager.invoke_hook(ResourceHookType.RESOURCE_PRE_FETCH, pre_payload, global_context, violations_as_exceptions=True)
+
                     # Use modified URI if plugin changed it
                     if pre_result.modified_payload:
                         uri = pre_result.modified_payload.uri
                         logger.debug(f"Resource URI modified by plugin: {original_uri} -> {uri}")
-
-                # Original resource fetching logic
-                logger.info(f"Fetching resource: {resource_id} (URI: {uri})")
-                # Check for template
-                if uri is not None and "{" in uri and "}" in uri:
-                    content = await self._read_template_resource(uri)
-                else:
-                    # Find resource
-                    resource = db.execute(select(DbResource).where(DbResource.id == resource_id).where(DbResource.is_active)).scalar_one_or_none()
-                    if not resource:
-                        # Check if inactive resource exists
-                        inactive_resource = db.execute(select(DbResource).where(DbResource.id == resource_id).where(not_(DbResource.is_active))).scalar_one_or_none()
-                        if inactive_resource:
-                            raise ResourceNotFoundError(f"Resource '{resource_id}' exists but is inactive")
-
-                        raise ResourceNotFoundError(f"Resource not found: {resource_id}")
-
-                    content = resource.content
-
-                # Call post-fetch hooks if plugin manager is available
-                if plugin_eligible:
+                    
                     # Create post-fetch payload
                     post_payload = ResourcePostFetchPayload(uri=original_uri, content=content)
 
@@ -834,35 +882,34 @@ class ResourceService:
                     # Use modified content if plugin changed it
                     if post_result.modified_payload:
                         content = post_result.modified_payload.content
-                # Set success attributes on span
-                if span:
-                    span.set_attribute("success", True)
-                    span.set_attribute("duration.ms", (time.monotonic() - start_time) * 1000)
-                    if content:
-                        span.set_attribute("content.size", len(str(content)))
+                        
+                    # Set success attributes on span
+                    if span:
+                        span.set_attribute("success", True)
+                        span.set_attribute("duration.ms", (time.monotonic() - start_time) * 1000)
+                        if content:
+                            span.set_attribute("content.size", len(str(content)))
 
-                success = True
+                    success = True
 
-                # Return standardized content without breaking callers that expect passthrough
-                # Prefer returning first-class content models or objects with content-like attributes.
-                # ResourceContent and TextContent already imported at top level
+                    # Return standardized content without breaking callers that expect passthrough
+                    # Prefer returning first-class content models or objects with content-like attributes.
 
-                # If content is already a Pydantic content model, return as-is
-                if isinstance(content, (ResourceContent, TextContent)):
-                    return content
-                # If content is any object that quacks like content (e.g., MagicMock with .text/.blob), return as-is
-                if hasattr(content, "text") or hasattr(content, "blob"):
-                    return content
+                    # ResourceContent and TextContent already imported at top level
+                    # If content is already a Pydantic content model, return as-is
+                    if isinstance(content, (ResourceContent, TextContent)):
+                        return content
+                    # If content is any object that quacks like content (e.g., MagicMock with .text/.blob), return as-is
+                    if hasattr(content, "text") or hasattr(content, "blob"):
+                        return content
+                    # Normalize primitive types to ResourceContent
+                    if isinstance(content, bytes):
+                        return ResourceContent(type="resource", id=resource_id, uri=original_uri, blob=content)
+                    if isinstance(content, str):
+                        return ResourceContent(type="resource", id=resource_id, uri=original_uri, text=content)
 
-                # Normalize primitive types to ResourceContent
-                if isinstance(content, bytes):
-                    return ResourceContent(type="resource", id=resource_id, uri=original_uri, blob=content)
-                if isinstance(content, str):
-                    return ResourceContent(type="resource", id=resource_id, uri=original_uri, text=content)
-
-                # Fallback to stringified content
-                return ResourceContent(type="resource", id=resource_id, uri=original_uri, text=str(content))
-
+                    # Fallback to stringified content
+                    return ResourceContent(type="resource", id=resource_id or content.id, uri=original_uri or content.uri, text=str(content))
             except Exception as e:
                 success = False
                 error_message = str(e)
@@ -874,7 +921,7 @@ class ResourceService:
                         await self._record_resource_metric(db, resource, start_time, success, error_message)
                     except Exception as metrics_error:
                         logger.warning(f"Failed to record resource metric: {metrics_error}")
-
+                
                 # End database span for observability dashboard
                 if db_span_id and observability_service and not db_span_ended:
                     try:
@@ -1436,7 +1483,7 @@ class ResourceService:
 
         return "application/octet-stream"
 
-    async def _read_template_resource(self, uri: str) -> ResourceContent:
+    async def _read_template_resource(self, db:Session, uri: str, include_inactive: Optional[bool]=False) -> ResourceContent:
         """Read a templated resource.
 
         Args:
@@ -1450,30 +1497,70 @@ class ResourceService:
             ResourceError: For other template errors
             NotImplementedError: When binary template is passed
         """
-        # Find matching template
+        # Find matching template # DRT BREAKPOINT
         template = None
+        if not self._template_cache:
+            logger.info("_template_cache is empty, fetching exisitng resource templates")
+            resource_templates = await self.list_resource_templates(db=db,include_inactive=include_inactive)
+            for i in resource_templates:
+                self._template_cache[i.name] = i
         for cached in self._template_cache.values():
             if self._uri_matches_template(uri, cached.uri_template):
                 template = cached
                 break
-
-        if not template:
+    
+        if template:
+            check_inactivity = db.execute(select(DbResource).where(DbResource.id == str(template.id)).where(not_(DbResource.is_active))).scalar_one_or_none()
+            if check_inactivity:
+                raise ResourceNotFoundError(
+                        f"Resource '{template.id}' exists but is inactive"
+                )
+        else:
             raise ResourceNotFoundError(f"No template matches URI: {uri}")
 
         try:
             # Extract parameters
             params = self._extract_template_params(uri, template.uri_template)
-
             # Generate content
             if template.mime_type and template.mime_type.startswith("text/"):
                 content = template.uri_template.format(**params)
-                return TextContent(type="text", text=content)
-
-            # Handle binary template
+                #return TextContent(type="text", text=content)
+                return ResourceContent(type="resource",
+                                       id=template.id or None,
+                                       uri=template.uri_template or None,
+                                       mime_type=template.mime_type or None,
+                                       text = content
+                                       )
+            # # Handle binary template
             raise NotImplementedError("Binary resource templates not yet supported")
 
         except Exception as e:
             raise ResourceError(f"Failed to process template: {str(e)}")
+
+    def _build_regex(self,template: str) -> re.Pattern:
+        """Build regex pattern for URI template, handling RFC 6570 syntax.
+
+        Supports:
+        - `{var}` - simple path parameter
+        - `{var*}` - wildcard path parameter (captures multiple segments)
+        - `{?var1,var2}` - query parameters (ignored in path matching)
+        """
+        # Remove query parameter syntax for path matching
+        template_without_query = re.sub(r"\{\?[^}]+\}", "", template)
+
+        parts = re.split(r"(\{[^}]+\})", template_without_query)
+        pattern = ""
+        for part in parts:
+            if part.startswith("{") and part.endswith("}"):
+                name = part[1:-1]
+                if name.endswith("*"):
+                    name = name[:-1]
+                    pattern += f"(?P<{name}>.+)"
+                else:
+                    pattern += f"(?P<{name}>[^/]+)"
+            else:
+                pattern += re.escape(part)
+        return re.compile(f"^{pattern}$")
 
     def _uri_matches_template(self, uri: str, template: str) -> bool:
         """Check if URI matches a template pattern.
@@ -1485,10 +1572,15 @@ class ResourceService:
         Returns:
             True if URI matches template
         """
-        # Convert template to regex pattern
 
-        pattern = re.escape(template).replace(r"\{.*?\}", r"[^/]+")
-        return bool(re.match(pattern, uri))
+        uri_path, _, _ = uri.partition("?")
+        # Match path parameters
+        regex = self._build_regex(template)
+        match = regex.match(uri_path)
+        if match:
+            return True
+        else:
+            return False
 
     def _extract_template_params(self, uri: str, template: str) -> Dict[str, str]:
         """Extract parameters from URI based on template.
@@ -1586,12 +1678,11 @@ class ResourceService:
             ...     result == ['resource_template']
             True
         """
-        query = select(DbResource).where(DbResource.template.isnot(None))
-        if not include_inactive:
-            query = query.where(DbResource.is_active)
+        query = select(DbResource).where(DbResource.uri_template.isnot(None))
         # Cursor-based pagination logic can be implemented here in the future.
         templates = db.execute(query).scalars().all()
-        return [ResourceTemplate.model_validate(t) for t in templates]
+        result = [ResourceTemplate.model_validate(t) for t in templates]
+        return result
 
     # --- Metrics ---
     async def aggregate_metrics(self, db: Session) -> ResourceMetrics:
