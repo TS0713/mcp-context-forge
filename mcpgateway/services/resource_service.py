@@ -449,8 +449,8 @@ class ResourceService:
             True
         """
         page_size = settings.pagination_default_page_size
-        query = select(DbResource).where(DbResource.uri_template.is_(None)).order_by(DbResource.id) # Consistent ordering for cursor pagination
-        
+        query = select(DbResource).where(DbResource.uri_template.is_(None)).order_by(DbResource.id)  # Consistent ordering for cursor pagination
+
         # Decode cursor to get last_id if provided
         last_id = None
         if cursor:
@@ -636,7 +636,12 @@ class ResourceService:
             >>> isinstance(result, list)
             True
         """
-        query = select(DbResource).join(server_resource_association, DbResource.id == server_resource_association.c.resource_id).where(DbResource.uri_template.is_(None)).where(server_resource_association.c.server_id == server_id)
+        query = (
+            select(DbResource)
+            .join(server_resource_association, DbResource.id == server_resource_association.c.resource_id)
+            .where(DbResource.uri_template.is_(None))
+            .where(server_resource_association.c.server_id == server_id)
+        )
         if not include_inactive:
             query = query.where(DbResource.is_active)
         # Cursor-based pagination logic can be implemented here in the future.
@@ -700,6 +705,7 @@ class ResourceService:
             ResourceError: If blocked by plugin
             PluginError: If encounters issue with plugin
             PluginViolationError: If plugin violated the request. Example - In case of OPA plugin, if the request is denied by policy.
+            ValueError: If neither resource_id nor resource_uri is provided
 
         Examples:
             >>> from mcpgateway.services.resource_service import ResourceService
@@ -732,20 +738,24 @@ class ResourceService:
         success = False
         error_message = None
         resource = None
+        uri = None
+        original_uri = None
+        content = None
+
         if resource_id:
             resource_db = db.get(DbResource, resource_id)
             uri = resource_db.uri if resource_db else None
         elif resource_uri:
             resource_db = db.execute(select(DbResource).where(DbResource.uri == str(resource_uri))).scalar_one_or_none()
             if resource_db:
-                #resource_id = resource_db.id or None
+                # resource_id = resource_db.id or None
                 uri = resource_db.uri or None
                 original_uri = resource_db.uri or None
             else:
                 content = await self._read_template_resource(db, resource_uri) or None
                 uri = content.uri
                 original_uri = content.uri
-                #resource_id = content.id
+                # resource_id = content.id
 
         # Create database span for observability dashboard
         trace_id = current_trace_id.get()
@@ -1481,38 +1491,39 @@ class ResourceService:
 
         return "application/octet-stream"
 
-    async def _read_template_resource(self, db:Session, uri: str, include_inactive: Optional[bool]=False) -> ResourceContent:
-        """Read a templated resource.
+    async def _read_template_resource(self, db: Session, uri: str, include_inactive: Optional[bool] = False) -> ResourceContent:
+        """
+        Read a templated resource.
 
         Args:
-            uri: Template URI with parameters
+            db: Database session.
+            uri: Template URI with parameters.
+            include_inactive: Whether to include inactive resources in DB lookups.
 
         Returns:
-            Resource content
+            ResourceContent: The resolved content from the matching template.
 
         Raises:
-            ResourceNotFoundError: If template not found
-            ResourceError: For other template errors
-            NotImplementedError: When binary template is passed
+            ResourceNotFoundError: If no matching template is found.
+            ResourceError: For other template resolution errors.
+            NotImplementedError: If a binary template resource is encountered.
         """
         # Find matching template # DRT BREAKPOINT
         template = None
         if not self._template_cache:
             logger.info("_template_cache is empty, fetching exisitng resource templates")
-            resource_templates = await self.list_resource_templates(db=db,include_inactive=include_inactive)
+            resource_templates = await self.list_resource_templates(db=db, include_inactive=include_inactive)
             for i in resource_templates:
                 self._template_cache[i.name] = i
         for cached in self._template_cache.values():
             if self._uri_matches_template(uri, cached.uri_template):
                 template = cached
                 break
-    
+
         if template:
             check_inactivity = db.execute(select(DbResource).where(DbResource.id == str(template.id)).where(not_(DbResource.is_active))).scalar_one_or_none()
             if check_inactivity:
-                raise ResourceNotFoundError(
-                        f"Resource '{template.id}' exists but is inactive"
-                )
+                raise ResourceNotFoundError(f"Resource '{template.id}' exists but is inactive")
         else:
             raise ResourceNotFoundError(f"No template matches URI: {uri}")
 
@@ -1522,12 +1533,7 @@ class ResourceService:
             # Generate content
             if template.mime_type and template.mime_type.startswith("text/"):
                 content = template.uri_template.format(**params)
-                return ResourceContent(type="resource",
-                                       id=str(template.id) or None,
-                                       uri=template.uri_template or None,
-                                       mime_type=template.mime_type or None,
-                                       text = content
-                                       )
+                return ResourceContent(type="resource", id=str(template.id) or None, uri=template.uri_template or None, mime_type=template.mime_type or None, text=content)
             # # Handle binary template
             raise NotImplementedError("Binary resource templates not yet supported")
 
@@ -1535,12 +1541,36 @@ class ResourceService:
             raise ResourceError(f"Failed to process template: {str(e)}")
 
     def _build_regex(self, template: str) -> re.Pattern:
-        """Build regex pattern for URI template, handling RFC 6570 syntax.
+        """
+        Convert a URI template into a compiled regular expression.
 
-        Supports:
-        - `{var}` - simple path parameter
-        - `{var*}` - wildcard path parameter (captures multiple segments)
-        - `{?var1,var2}` - query parameters (ignored in path matching)
+        This parser supports a subset of RFC 6570–style templates for path
+        matching. It extracts path parameters and converts them into named
+        regex groups.
+
+        Supported template features:
+        - `{var}`
+        A simple path parameter. Matches a single URI segment
+        (i.e., any characters except `/`).
+        → Translates to `(?P<var>[^/]+)`
+        - `{var*}`
+        A wildcard parameter. Matches one or more URI segments,
+        including `/`.
+        → Translates to `(?P<var>.+)`
+        - `{?var1,var2}`
+        Query-parameter expressions. These are ignored when building
+        the regex for path matching and are stripped from the template.
+
+        Example:
+            Template: "files://root/{path*}/meta/{id}{?expand,debug}"
+            Regex: r"^files://root/(?P<path>.+)/meta/(?P<id>[^/]+)$"
+
+        Args:
+            template: The URI template string containing parameter expressions.
+
+        Returns:
+            A compiled regular expression (re.Pattern) that can be used to
+            match URIs and extract parameter values.
         """
         # Remove query parameter syntax for path matching
         template_without_query = re.sub(r"\{\?[^}]+\}", "", template)
@@ -1559,39 +1589,34 @@ class ResourceService:
                 pattern += re.escape(part)
         return re.compile(f"^{pattern}$")
 
-    def _uri_matches_template(self, uri: str, template: str) -> bool:
-        """Check if URI matches a template pattern.
-
-        Args:
-            uri: URI to check
-            template: Template pattern
-
-        Returns:
-            True if URI matches template
-        """
-
-        uri_path, _, _ = uri.partition("?")
-        # Match path parameters
-        regex = self._build_regex(template)
-        match = regex.match(uri_path)
-        if match:
-            return True
-        else:
-            return False
-
     def _extract_template_params(self, uri: str, template: str) -> Dict[str, str]:
-        """Extract parameters from URI based on template.
+        """
+        Extract parameters from a URI based on a template.
 
         Args:
-            uri: URI with parameter values
-            template: Template pattern
+            uri: The actual URI containing parameter values.
+            template: The template pattern (e.g. "file:///{name}/{id}").
 
         Returns:
-            Dict of parameter names and values
+            Dict of parameter names and extracted values.
         """
-
         result = parse.parse(template, uri)
         return result.named if result else {}
+    
+    def _uri_matches_template(self, uri: str, template: str) -> bool:
+        """
+        Check whether a URI matches a given template pattern.
+
+        Args:
+            uri: The URI to check.
+            template: The template pattern.
+
+        Returns:
+            True if the URI matches the template, otherwise False.
+        """
+        uri_path, _, _ = uri.partition("?")
+        regex = self._build_regex(template)
+        return bool(regex.match(uri_path))
 
     async def _notify_resource_added(self, resource: DbResource) -> None:
         """
@@ -1650,7 +1675,7 @@ class ResourceService:
                 await queue.put(event)
 
     # --- Resource templates ---
-    async def list_resource_templates(self, db: Session, include_inactive: bool = False) -> List[ResourceTemplate]:
+    async def list_resource_templates(self, db: Session, include_inactive: Optional[bool] = False) -> List[ResourceTemplate]:
         """
         List resource templates.
 
