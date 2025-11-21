@@ -684,7 +684,7 @@ class ResourceService:
         request_id: Optional[str] = None,
         user: Optional[str] = None,
         server_id: Optional[str] = None,
-        include_inactive: Optional[bool] = False,
+        include_inactive: bool = False,
     ) -> ResourceContent:
         """Read a resource's content with plugin hook support.
 
@@ -1677,7 +1677,7 @@ class ResourceService:
                 await queue.put(event)
 
     # --- Resource templates ---
-    async def list_resource_templates(self, db: Session, include_inactive: Optional[bool] = False) -> List[ResourceTemplate]:
+    async def list_resource_templates(self, db: Session, include_inactive: bool = False) -> List[ResourceTemplate]:
         """
         List resource templates.
 
