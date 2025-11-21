@@ -431,17 +431,13 @@ class TestResourceListing:
 
         assert len(result) == 1
 
-
 # --------------------------------------------------------------------------- #
 # Resource reading tests                                                      #
 # --------------------------------------------------------------------------- #
 
-
 class TestResourceReading:
     """Test resource reading functionality."""
 
-
-    
     @pytest.mark.asyncio
     async def test_read_resource_success(self, mock_db, mock_resource):
         """Test successful resource reading."""
