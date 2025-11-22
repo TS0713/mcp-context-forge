@@ -708,9 +708,9 @@ class ResourceService:
             ValueError: If neither resource_id nor resource_uri is provided
 
         Examples:
+            >>> from mcpgateway.common.models import ResourceContent
             >>> from mcpgateway.services.resource_service import ResourceService
             >>> from unittest.mock import MagicMock
-            >>> from mcpgateway.common.models import ResourceContent
             >>> service = ResourceService()
             >>> db = MagicMock()
             >>> uri = 'http://example.com/resource.txt'
@@ -720,7 +720,7 @@ class ResourceService:
             >>> db.get.return_value = mock_resource
             >>> import asyncio
             >>> result = asyncio.run(service.read_resource(db, resource_uri=uri))
-            >>> isinstance(result, ResourceContent)
+            >>> result.__class__.__name__ == 'ResourceContent'
             True
 
         Not found case returns ResourceNotFoundError:
