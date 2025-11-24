@@ -860,7 +860,6 @@ class ResourceService:
                         raise ResourceNotFoundError(f"Resource template not found for '{resource_uri}'")
 
                 if resource_id:
-
                     # if resource_id provided instead of resource_uri
                     # retrieves resource based on resource_id
                     query = select(DbResource).where(DbResource.id == str(resource_id)).where(DbResource.is_active)
@@ -874,10 +873,7 @@ class ResourceService:
                         check_inactivity = db.execute(select(DbResource).where(DbResource.id == str(resource_id)).where(not_(DbResource.is_active))).scalar_one_or_none()
                         if check_inactivity:
                             raise ResourceNotFoundError(f"Resource '{resource_id}' exists but is inactive")
-                        else:
-                            raise ResourceNotFoundError(f"Resource '{resource_id}' not found")
-
-                        # raise ResourceNotFoundError(f"Resource not found for the resource id: {resource_id}")
+                        raise ResourceNotFoundError(f"Resource not found for the resource id: {resource_id}")
 
                 # Call post-fetch hooks if plugin manager is available
                 if plugin_eligible:
