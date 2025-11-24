@@ -457,7 +457,7 @@ class TestResourceReading:
         mock_db.execute.return_value = mock_scalar
 
         with pytest.raises(ResourceNotFoundError):
-            await resource_service.read_resource(mock_db, "test://missing")
+            await resource_service.read_resource(mock_db, resource_uri = "test://missing")
 
     @pytest.mark.asyncio
     async def test_read_resource_inactive(self, resource_service, mock_db, mock_inactive_resource):

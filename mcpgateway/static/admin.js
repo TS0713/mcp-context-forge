@@ -3524,16 +3524,24 @@ function toggleA2AAuthFields(authType) {
 /**
  * SECURE: View Resource function with safe display
  */
-async function viewResource(resourceUri) {
+async function viewResource(resourceId) {
     try {
-        console.log(`Viewing resource: ${resourceUri}`);
+        console.log(`Viewing resource: ${resourceId}`);
 
         const response = await fetchWithTimeout(
-            `${window.ROOT_PATH}/admin/resources/${encodeURIComponent(resourceUri)}`,
+            `${window.ROOT_PATH}/admin/resources/${encodeURIComponent(resourceId)}`,
         );
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            let errorDetail = "";
+            try {
+                const errorJson = await response.json();
+                errorDetail = errorJson.detail || "";
+            } catch (_) {}
+
+            throw new Error(
+                `HTTP ${response.status}: ${errorDetail || response.statusText}`,
+            );
         }
 
         const data = await response.json();
